@@ -184,6 +184,69 @@
     </div>
 
     <script>
+        // ─── Supabase 설정 ───────────────────────────────────────
+        const SUPABASE_URL = 'https://peawevlcywmaadvigoug.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlYXdldmxjeXdtYWFkdmlnb3VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTAwMDQsImV4cCI6MjA5MjkyNjAwNH0.DB__CEJh3iUbyAchY8OIryoGTJcxeO1gEZt2upXzOlA';
+
+        async function sbFetch(path, options = {}) {
+            const res = await fetch(SUPABASE_URL + path, {
+                ...options,
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': 'Bearer ' + SUPABASE_KEY,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation',
+                    ...(options.headers || {})
+                }
+            });
+            if (res.status === 204) return [];
+            return res.json();
+        }
+
+        async function loadFromSupabase() {
+            const data = await sbFetch('/rest/v1/bids?select=*&order=post_date.desc');
+            if (!Array.isArray(data) || data.length === 0) {
+                await saveAllToSupabase(initialData);
+                return initialData.map(b => ({...b}));
+            }
+            return data.map(row => ({
+                id: row.id,
+                postDate: row.post_date || '',
+                date: row.date || '',
+                openDate: row.open_date || '',
+                rank: row.rank || '',
+                client: row.client || '',
+                title: row.title || '',
+                amount: row.amount || 0,
+                result: row.result || '',
+                winner: row.winner || '',
+                partners: row.partners || '',
+                noticeFiles: row.notice_files ? JSON.parse(row.notice_files) : [],
+                taskFiles: row.task_files ? JSON.parse(row.task_files) : []
+            }));
+        }
+
+        async function saveAllToSupabase(data) {
+            await sbFetch('/rest/v1/bids?id=gte.0', { method: 'DELETE', headers: { 'Prefer': '' } });
+            const rows = data.map(b => ({
+                id: b.id,
+                post_date: b.postDate || '',
+                date: b.date || '',
+                open_date: b.openDate || '',
+                rank: b.rank || '',
+                client: b.client || '',
+                title: b.title || '',
+                amount: b.amount || 0,
+                result: b.result || '',
+                winner: b.winner || '',
+                partners: b.partners || '',
+                notice_files: JSON.stringify(b.noticeFiles || []),
+                task_files: JSON.stringify(b.taskFiles || [])
+            }));
+            await sbFetch('/rest/v1/bids', { method: 'POST', body: JSON.stringify(rows) });
+        }
+        // ────────────────────────────────────────────────────────
+
         // CSV 파일의 22건 전체 데이터를 배열에 정확히 매칭했습니다.
         const initialData = [
             { id: 1, postDate: '2025-12-31', date: '2026-01-13', openDate: '2026-02-12', rank: '14위', client: '연천군맑은물관리사업소', title: '청산배수지건설공사기본및실시설계용역', amount: 73384542, result: '타사낙찰', winner: '동명', partners: '삼안:한맥:바론:경수' },
@@ -226,8 +289,14 @@
             { id: 38, postDate: '2026-03-17', date: '-', openDate: '-', rank: '-', client: '인제시', title: '빙어호 인도교 조성사업 기본설계 용역', amount: 0, result: '타사낙찰', winner: '바우', partners: '한맥:바론' }
         ];
 
-        let bids = initialData.map(b => ({...b}));
+        let bids = [];
         let pChart, bChart;
+
+        // 초기 로딩
+        async function initApp() {
+            bids = await loadFromSupabase();
+            renderAll();
+        }
 
         function renderAll() {
             const query = document.getElementById('search').value.toLowerCase();
@@ -273,12 +342,13 @@
             td.querySelector('input').focus();
         }
 
-        function savePartners(bidId) {
+        async function savePartners(bidId) {
             const input = document.getElementById('pe_' + bidId);
             if (!input) return;
             const b = bids.find(x => x.id === bidId);
             if (!b) return;
             b.partners = input.value.trim() || '0';
+            await saveAllToSupabase(bids);
             renderAll();
         }
 
@@ -304,6 +374,7 @@
                         else b.taskFiles = [...(b.taskFiles||[]), fileObj];
                         done++;
                         if (done === files.length) {
+                            await saveAllToSupabase(bids);
                             renderAll();
                         }
                     };
@@ -326,11 +397,12 @@
             a.click();
         }
 
-        function removeFile(bidId, type, idx) {
+        async function removeFile(bidId, type, idx) {
             const b = bids.find(x => x.id === bidId);
             if (!b) return;
             if (type === 'notice') b.noticeFiles.splice(idx, 1);
             else b.taskFiles.splice(idx, 1);
+            await saveAllToSupabase(bids);
             renderAll();
         }
 
@@ -387,10 +459,11 @@
                 input.placeholder = opts.placeholder || '';
             }
 
-            const save = () => {
+            const save = async () => {
                 let newVal = opts.number ? Number(input.value) : input.value.trim();
                 if (field === 'partners' && (!newVal || newVal === '')) newVal = '0';
                 b[field] = newVal;
+                await saveAllToSupabase(bids);
                 renderAll();
             };
 
@@ -622,7 +695,7 @@
 
         function closeModal() { document.getElementById('modal').classList.add('hidden'); }
 
-        document.getElementById('bidForm').onsubmit = function(e) {
+        document.getElementById('bidForm').onsubmit = async function(e) {
             e.preventDefault();
             const id = document.getElementById('edit-id').value;
             const newData = {
@@ -642,13 +715,14 @@
             };
             if(id) bids[bids.findIndex(x => x.id === parseInt(id))] = newData;
             else bids.unshift(newData);
+            await saveAllToSupabase(bids);
             renderAll(); closeModal();
         };
 
-        function deleteBid(id) { if(confirm('삭제?')) { bids = bids.filter(x => x.id !== id); renderAll(); } }
+        async function deleteBid(id) { if(confirm('삭제?')) { bids = bids.filter(x => x.id !== id); await saveAllToSupabase(bids); renderAll(); } }
         function editBid(id) { openModal(id); }
 
-        window.onload = renderAll;
+        window.onload = initApp;
     </script>
 </body>
 </html>
