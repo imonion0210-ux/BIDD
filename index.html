@@ -174,13 +174,47 @@ async function sbFetch(path, options = {}) {
   return res.json();
 }
 
-async function loadFromSupabase() {
-  const data = await sbFetch('/rest/v1/bids?select=*&order=post_date.desc');
-  if (!Array.isArray(data) || data.length === 0) {
-    await saveAllToSupabase(initialData);
-    return initialData.map(b => ({...b}));
+// ───── localStorage 캐시 헬퍼 ─────
+const LS_KEY = 'baron_bids_cache';
+
+function saveToCache(data) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
+  } catch(e) {
+    console.warn('[Cache] 저장 실패 (용량 초과일 수 있음):', e);
+    // 첨부파일 데이터 제외하고 저장 재시도
+    try {
+      const slim = data.map(b => ({...b, noticeFiles: b.noticeFiles?.map(f=>({name:f.name||f})) || [], taskFiles: b.taskFiles?.map(f=>({name:f.name||f})) || []}));
+      localStorage.setItem(LS_KEY, JSON.stringify(slim));
+    } catch(e2) { console.warn('[Cache] 슬림 저장도 실패:', e2); }
   }
-  return data.map(row => ({
+}
+
+function loadFromCache() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+function showBanner(msg, color = '#1e40af') {
+  let el = document.getElementById('_syncBanner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = '_syncBanner';
+    el.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 18px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;pointer-events:none;transition:opacity 0.5s;font-family:Pretendard,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,0.2)';
+    document.body.appendChild(el);
+  }
+  el.style.background = color;
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, 2500);
+}
+// ─────────────────────────────────
+
+function parseRow(row) {
+  return {
     id: row.id,
     postDate: row.post_date || '',
     date: row.date || '',
@@ -194,27 +228,100 @@ async function loadFromSupabase() {
     partners: row.partners || '',
     noticeFiles: row.notice_files ? JSON.parse(row.notice_files) : [],
     taskFiles: row.task_files ? JSON.parse(row.task_files) : []
-  }));
+  };
+}
+
+async function loadFromSupabase() {
+  const cached = loadFromCache();
+
+  try {
+    const data = await sbFetch('/rest/v1/bids?select=*&order=post_date.desc');
+
+    if (!Array.isArray(data) || data.length === 0) {
+      // Supabase가 비어있고 로컬에 데이터 있으면 복원
+      if (cached && cached.length > 0) {
+        showBanner('⏫ 로컬 데이터를 서버에 복원 중...', '#1d4ed8');
+        await saveAllToSupabase(cached);
+        return cached;
+      }
+      await saveAllToSupabase(initialData);
+      return initialData.map(b => ({...b}));
+    }
+
+    const fromServer = data.map(parseRow);
+
+    // 캐시 건수가 더 많으면 로컬이 더 최신 (서버 저장이 일부 실패한 케이스)
+    if (cached && cached.length > fromServer.length) {
+      showBanner('⏫ 로컬 데이터를 서버에 동기화 중...', '#1d4ed8');
+      await saveAllToSupabase(cached);
+      return cached;
+    }
+
+    saveToCache(fromServer);
+    return fromServer;
+
+  } catch(e) {
+    console.warn('[Supabase] 로드 실패, 캐시 사용:', e);
+    if (cached && cached.length > 0) {
+      showBanner('⚠️ 오프라인 — 로컬 데이터 표시 중', '#b45309');
+      return cached;
+    }
+    showBanner('⚠️ 연결 실패 — 기본 데이터 표시 중', '#b91c1c');
+    return initialData.map(b => ({...b}));
+  }
 }
 
 async function saveAllToSupabase(data) {
-  await sbFetch('/rest/v1/bids?id=gte.0', { method: 'DELETE', headers: { 'Prefer': '' } });
-  const rows = data.map(b => ({
-    id: b.id,
-    post_date: b.postDate || '',
-    date: b.date || '',
-    open_date: b.openDate || '',
-    rank: b.rank || '',
-    client: b.client || '',
-    title: b.title || '',
-    amount: b.amount || 0,
-    result: b.result || '',
-    winner: b.winner || '',
-    partners: b.partners || '',
-    notice_files: JSON.stringify(b.noticeFiles || []),
-    task_files: JSON.stringify(b.taskFiles || [])
-  }));
-  await sbFetch('/rest/v1/bids', { method: 'POST', body: JSON.stringify(rows) });
+  // 1. 항상 먼저 로컬에 저장
+  saveToCache(data);
+  showBanner('✓ 저장됨', '#1e40af');
+
+  try {
+    // 2. 메타데이터 upsert (첨부파일 제외 → 용량 작음)
+    const metaRows = data.map(b => ({
+      id: b.id,
+      post_date: b.postDate || '',
+      date: b.date || '',
+      open_date: b.openDate || '',
+      rank: b.rank || '',
+      client: b.client || '',
+      title: b.title || '',
+      amount: b.amount || 0,
+      result: b.result || '',
+      winner: b.winner || '',
+      partners: b.partners || ''
+    }));
+    await sbFetch('/rest/v1/bids', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(metaRows)
+    });
+
+    // 3. 첨부파일 있는 항목만 개별 PATCH
+    const withFiles = data.filter(b => (b.noticeFiles||[]).length > 0 || (b.taskFiles||[]).length > 0);
+    for (const b of withFiles) {
+      await sbFetch('/rest/v1/bids?id=eq.' + b.id, {
+        method: 'PATCH',
+        headers: { 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          notice_files: JSON.stringify(b.noticeFiles || []),
+          task_files: JSON.stringify(b.taskFiles || [])
+        })
+      });
+    }
+
+    // 4. 로컬에서 삭제된 항목 Supabase에서도 삭제
+    const remoteIds = (await sbFetch('/rest/v1/bids?select=id')).map(r => r.id);
+    const localIds = new Set(data.map(b => b.id));
+    for (const rid of remoteIds) {
+      if (!localIds.has(rid)) {
+        await sbFetch('/rest/v1/bids?id=eq.' + rid, { method: 'DELETE', headers: { 'Prefer': '' } });
+      }
+    }
+  } catch(e) {
+    console.warn('[Supabase] 저장 실패 (로컬에는 저장됨):', e);
+    showBanner('⚠️ 서버 저장 실패 — 로컬에만 저장됨', '#b45309');
+  }
 }
 
 const initialData = [
