@@ -310,14 +310,17 @@ async function saveAllToSupabase(data) {
       });
     }
 
-    // 4. 로컬에서 삭제된 항목 Supabase에서도 삭제
-    const remoteIds = (await sbFetch('/rest/v1/bids?select=id')).map(r => r.id);
-    const localIds = new Set(data.map(b => b.id));
-    for (const rid of remoteIds) {
-      if (!localIds.has(rid)) {
-        await sbFetch('/rest/v1/bids?id=eq.' + rid, { method: 'DELETE', headers: { 'Prefer': '' } });
+    // 4. 로컬에서 삭제된 항목 Supabase에서도 삭제 (실패해도 무시)
+    try {
+      const remoteIds = (await sbFetch('/rest/v1/bids?select=id')).map(r => r.id);
+      const localIds = new Set(data.map(b => b.id));
+      for (const rid of remoteIds) {
+        if (!localIds.has(rid)) {
+          await sbFetch('/rest/v1/bids?id=eq.' + rid, { method: 'DELETE', headers: { 'Prefer': '' } });
+        }
       }
-    }
+    } catch(e2) { console.warn('[Supabase] 삭제 동기화 실패 (무시):', e2); }
+
   } catch(e) {
     console.warn('[Supabase] 저장 실패 (로컬에는 저장됨):', e);
     showBanner('⚠️ 서버 저장 실패 — 로컬에만 저장됨', '#b45309');
@@ -426,32 +429,61 @@ async function savePartners(bidId) {
   renderAll();
 }
 
-// ✅ 핵심 수정: reader.onload를 async로 선언
+// ───── Supabase Storage 파일 업로드 ─────
+const STORAGE_BUCKET = 'bid-files';
+
+async function uploadToStorage(bidId, type, file) {
+  const ext = file.name.split('.').pop();
+  const path = `${bidId}/${type}/${Date.now()}_${file.name}`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': file.type || 'application/octet-stream',
+      'x-upsert': 'true'
+    },
+    body: file
+  });
+  if (!res.ok) throw new Error('업로드 실패: ' + res.status);
+  return { name: file.name, path, mime: file.type };
+}
+
+async function deleteFromStorage(path) {
+  await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+  });
+}
+
+function getStorageUrl(path) {
+  return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
+}
+
 function triggerUpload(bidId, type) {
   const input = document.createElement('input');
   input.type = 'file';
   input.multiple = true;
   input.accept = '.pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png';
-  input.onchange = () => {
+  input.onchange = async () => {
     const files = Array.from(input.files);
     if (!files.length) return;
-    let done = 0;
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {  // ✅ async 추가
-        const b = bids.find(x => x.id === bidId);
-        if (!b) return;
-        const fileObj = { name: file.name, data: e.target.result, mime: file.type };
+    const b = bids.find(x => x.id === bidId);
+    if (!b) return;
+    showBanner('⏫ 파일 업로드 중...', '#1d4ed8');
+    try {
+      for (const file of files) {
+        const fileObj = await uploadToStorage(bidId, type, file);
         if (type === 'notice') b.noticeFiles = [...(b.noticeFiles || []), fileObj];
         else b.taskFiles = [...(b.taskFiles || []), fileObj];
-        done++;
-        if (done === files.length) {
-          await saveAllToSupabase(bids);
-          renderAll();
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+      }
+      await saveAllToSupabase(bids);
+      renderAll();
+      showBanner('✓ 파일 업로드 완료', '#059669');
+    } catch(e) {
+      console.error('파일 업로드 실패:', e);
+      showBanner('⚠️ 파일 업로드 실패', '#b91c1c');
+    }
   };
   input.click();
 }
@@ -461,18 +493,31 @@ function downloadFile(bidId, type, idx) {
   if (!b) return;
   const f = (type === 'notice' ? b.noticeFiles : b.taskFiles)[idx];
   if (!f) return;
-  if (typeof f === 'string') { alert('이전 방식으로 저장된 파일명: ' + f); return; }
-  const a = document.createElement('a');
-  a.href = f.data;
-  a.download = f.name;
-  a.click();
+  // Storage URL 방식
+  if (f.path) {
+    window.open(getStorageUrl(f.path), '_blank');
+    return;
+  }
+  // 구 base64 방식 fallback
+  if (f.data) {
+    const a = document.createElement('a');
+    a.href = f.data;
+    a.download = f.name;
+    a.click();
+    return;
+  }
+  alert('파일을 찾을 수 없습니다: ' + f.name);
 }
 
 async function removeFile(bidId, type, idx) {
   const b = bids.find(x => x.id === bidId);
   if (!b) return;
-  if (type === 'notice') b.noticeFiles.splice(idx, 1);
-  else b.taskFiles.splice(idx, 1);
+  const arr = type === 'notice' ? b.noticeFiles : b.taskFiles;
+  const f = arr[idx];
+  if (f && f.path) {
+    try { await deleteFromStorage(f.path); } catch(e) { console.warn('스토리지 삭제 실패:', e); }
+  }
+  arr.splice(idx, 1);
   await saveAllToSupabase(bids);
   renderAll();
 }
@@ -662,21 +707,17 @@ function renderCharts(data) {
 
 // 모달 파일 관리
 let _modalFiles = { notice: [], task: [] };
+let _modalPendingFiles = { notice: [], task: [] }; // 아직 업로드 안 된 File 객체
 
 function handleModalUpload(event, containerId) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
   const type = containerId === 'notice-files' ? 'notice' : 'task';
-  let done = 0;
   files.forEach(file => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      _modalFiles[type].push({ name: file.name, data: e.target.result, mime: file.type });
-      done++;
-      if (done === files.length) renderModalFileList(containerId, type);
-    };
-    reader.readAsDataURL(file);
+    _modalPendingFiles[type].push(file);
+    _modalFiles[type].push({ name: file.name, pending: true });
   });
+  renderModalFileList(containerId, type);
   event.target.value = '';
 }
 
@@ -702,6 +743,7 @@ function loadFileList(containerId, files = []) {
 
 function openModal(id = null) {
   _modalFiles = { notice: [], task: [] };
+  _modalPendingFiles = { notice: [], task: [] };
   document.getElementById('modal').classList.remove('hidden');
   if (id) {
     const b = bids.find(x => x.id === id);
@@ -731,8 +773,32 @@ function closeModal() { document.getElementById('modal').classList.add('hidden')
 
 async function submitForm() {
   const id = document.getElementById('edit-id').value;
+  const bidId = id ? parseInt(id) : Date.now();
+
+  // Storage에 pending 파일 업로드
+  showBanner('⏫ 저장 중...', '#1d4ed8');
+  try {
+    for (const file of _modalPendingFiles.notice) {
+      const fileObj = await uploadToStorage(bidId, 'notice', file);
+      // pending 항목을 실제 fileObj로 교체
+      const pi = _modalFiles.notice.findIndex(f => f.pending && f.name === file.name);
+      if (pi >= 0) _modalFiles.notice[pi] = fileObj;
+      else _modalFiles.notice.push(fileObj);
+    }
+    for (const file of _modalPendingFiles.task) {
+      const fileObj = await uploadToStorage(bidId, 'task', file);
+      const pi = _modalFiles.task.findIndex(f => f.pending && f.name === file.name);
+      if (pi >= 0) _modalFiles.task[pi] = fileObj;
+      else _modalFiles.task.push(fileObj);
+    }
+  } catch(e) {
+    console.error('파일 업로드 실패:', e);
+    showBanner('⚠️ 파일 업로드 실패', '#b91c1c');
+    return;
+  }
+
   const newData = {
-    id: id ? parseInt(id) : Date.now(),
+    id: bidId,
     postDate: document.getElementById('m_post_date').value,
     date: document.getElementById('m_date').value,
     openDate: document.getElementById('m_open_date').value,
@@ -743,8 +809,8 @@ async function submitForm() {
     result: document.getElementById('m_result').value,
     winner: document.getElementById('m_winner').value,
     partners: document.getElementById('m_partners').value,
-    noticeFiles: _modalFiles.notice,
-    taskFiles: _modalFiles.task
+    noticeFiles: _modalFiles.notice.filter(f => !f.pending),
+    taskFiles: _modalFiles.task.filter(f => !f.pending)
   };
   if (id) bids[bids.findIndex(x => x.id === parseInt(id))] = newData;
   else bids.unshift(newData);
