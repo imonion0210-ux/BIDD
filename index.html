@@ -171,7 +171,9 @@ async function sbFetch(path, options = {}) {
     }
   });
   if (res.status === 204) return [];
-  return res.json();
+  const text = await res.text();
+  if (!text || text.trim() === '') return [];
+  return JSON.parse(text);
 }
 
 // ───── localStorage 캐시 헬퍼 ─────
