@@ -342,44 +342,24 @@ const SHEET_ID = '1_zwovmYYRPwQqOG79wLu0OSVn0XaeHur_Fyh92IY3E4';
 const SHEET_GID = '465680672';
 
 async function loadFromSheets() {
-  // range=A2:Z 로 2행부터 읽고, headers=1 로 첫번째 읽은 행(=원래 2행)을 헤더로
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}&range=A2:Z&headers=1`;
-  const res = await fetch(url);
-  const text = await res.text();
-  const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
-  console.log('📡 컬럼:', json.table.cols.map(c=>c.label));
-  const rowsRaw = json.table.rows;
-
-  // 열 순서: 공고일(0) 등록마감일(1) 개찰일시(2) 발주처(3) 용역명(4)
-  // 총사업금액(5) 참여사(6) 바론지분율(7) 바론지분금액(8) 낙찰결과(9) 낙찰사(10) 개찰순위(11)
-  const v = (row, i) => {
-    const cell = row.c[i];
-    return cell && cell.v != null ? cell.v.toString().trim() : '';
-  };
-
-  const rows = [];
-  for (let i = 0; i < rowsRaw.length; i++) {
-    const row = rowsRaw[i];
-    if (!row || !row.c) continue;
-    const title = v(row, 4);
-    if (!title) continue;
-    rows.push({
-      id: i + 1,
-      postDate:  v(row, 0),
-      date:      v(row, 1),
-      openDate:  v(row, 2),
-      client:    v(row, 3),
-      title,
-      amount:    (() => { const cell = row.c[8]; if (!cell || cell.v == null) return 0; const n = parseFloat(cell.v.toString().replace(/,/g,'')); return isNaN(n) ? 0 : Math.round(n); })(),
-      result:    v(row, 9) || '-',
-      winner:    v(row, 10) || '-',
-      rank:      v(row, 11) || '-',
-      partners:  v(row, 6),
-      noticeFiles: [],
-      taskFiles: []
-    });
-  }
-  return rows;
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbwsJ_thyFTAu7c7T_BFT9n4jBH0sZdW3C3kjcuKWlmh_zt7C6Q15KPdfsTuyBYi2b3g/exec';
+  const res = await fetch(GAS_URL);
+  const data = await res.json();
+  return data.map((r, i) => ({
+    id: i + 1,
+    postDate:  r.postDate  || '',
+    date:      r.date      || '',
+    openDate:  r.openDate  || '',
+    client:    r.client    || '',
+    title:     r.title     || '',
+    amount:    r.amount    || 0,
+    result:    r.result    || '-',
+    winner:    r.winner    || '-',
+    rank:      r.rank      || '-',
+    partners:  r.partners  || '',
+    noticeFiles: [],
+    taskFiles: []
+  }));
 }
 
 async function loadData() {
