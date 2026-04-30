@@ -318,23 +318,6 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const LS_KEY = 'baron_v2_bids';
 const BUCKET = 'bid-files';
 
-// ── Google Sheets 연동 설정 ──
-// ↓↓↓ Apps Script 배포 후 여기에 URL을 붙여넣으세요 ↓↓↓
-const GAS_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
-
-async function syncToSheets(data) {
-  if (!GAS_URL || GAS_URL === 'YOUR_APPS_SCRIPT_URL_HERE') return;
-  try {
-    await fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'write', data: data }),
-    });
-    showBanner('📊 구글 시트 동기화 완료', '#059669');
-  } catch(e) {
-    showBanner('⚠️ 구글 시트 동기화 실패', '#b45309');
-  }
-}
-
 let bids = [], activeFilter = 'all', samanCh, hanmaekCh, monthCh;
 let modalFiles = {notice:[], task:[]}, pendingFiles = {notice:[], task:[]};
 
@@ -354,8 +337,71 @@ function parse(r) {
 function saveCache(d) { try { localStorage.setItem(LS_KEY,JSON.stringify(d)); } catch(e){} }
 function loadCache() { try { const r=localStorage.getItem(LS_KEY); return r?JSON.parse(r):null; } catch(e){return null;} }
 
+// ── Google Sheets 연동 ──
+const SHEET_ID = '1_zwovmYYRPwQqOG79wLu0OSVn0XaeHur_Fyh92IY3E4';
+const SHEET_GID = '465680672';
+
+async function loadFromSheets() {
+  // 구글 시트 공개 JSON API (CORS 우회 가능)
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
+  const res = await fetch(url);
+  const text = await res.text();
+  // 구글이 반환하는 형식: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
+  const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+  const cols = json.table.cols;
+  const rowsRaw = json.table.rows;
+
+  // 2행이 헤더 (index 1), 3행부터 데이터 (index 2~)
+  // cols[i].label 은 구글이 인식한 헤더인데 1행 기준일 수 있어서
+  // 직접 rowsRaw[1] (2번째 행) 을 헤더로 사용
+  const headerRow = rowsRaw[1].c.map(c => c ? (c.v || '').toString().trim() : '');
+
+  const get = (row, name) => {
+    const idx = headerRow.findIndex(h => h.includes(name));
+    if (idx < 0) return '';
+    const cell = row.c[idx];
+    return cell && cell.v != null ? cell.v.toString().trim() : '';
+  };
+
+  const rows = [];
+  for (let i = 2; i < rowsRaw.length; i++) {
+    const row = rowsRaw[i];
+    if (!row || !row.c) continue;
+    const title = get(row, '용역명');
+    if (!title) continue; // 빈 행 건너뜀
+    rows.push({
+      id: i,
+      postDate:  get(row, '공고일'),
+      date:      get(row, '등록마감일'),
+      openDate:  get(row, '개찰일시'),
+      client:    get(row, '발주처'),
+      title,
+      amount:    parseInt((get(row, '바론지분금액') || '0').replace(/[^0-9]/g,'')) || 0,
+      result:    get(row, '낙찰결과') || '-',
+      winner:    '-',
+      rank:      get(row, '개찰순위') || '-',
+      partners:  get(row, '참여사'),
+      noticeFiles: [],
+      taskFiles: []
+    });
+  }
+  return rows;
+}
+
 async function loadData() {
   const cache = loadCache();
+  // 1. 구글 시트에서 먼저 불러오기
+  try {
+    const sheetData = await loadFromSheets();
+    if (sheetData && sheetData.length > 0) {
+      showBanner('📊 구글 시트에서 불러옴', '#059669');
+      saveCache(sheetData);
+      return sheetData;
+    }
+  } catch(e) {
+    console.warn('구글 시트 로드 실패, Supabase 시도', e);
+  }
+  // 2. 구글 시트 실패 시 Supabase fallback
   try {
     const data = await sbFetch('/rest/v1/bids?select=*&order=post_date.desc');
     if (!Array.isArray(data)||data.length===0) {
@@ -363,7 +409,6 @@ async function loadData() {
       await saveAll(INIT);return INIT.map(b=>({...b}));
     }
     const fromSv = data.map(parse);
-    if (cache&&cache.length>fromSv.length){showBanner('⏫ 동기화 중...','#1d4ed8');await saveAll(cache);return cache;}
     saveCache(fromSv);return fromSv;
   } catch(e) {
     showBanner('⚠️ 오프라인 — 로컬 데이터 표시','#b45309');
@@ -373,7 +418,6 @@ async function loadData() {
 
 async function saveAll(data) {
   saveCache(data);
-  syncToSheets(data); // ← 구글 시트 자동 동기화
   showBanner('✓ 저장됨','#059669');
   try {
     const rows = data.map(b=>({id:b.id,post_date:b.postDate||'',date:b.date||'',open_date:b.openDate||'',rank:b.rank||'',client:b.client||'',title:b.title||'',amount:b.amount||0,result:b.result||'-',winner:b.winner||'-',partners:b.partners||''}));
@@ -414,10 +458,10 @@ function showBanner(msg,color='#1d4ed8'){
 async function checkConn(){
   const dot=document.getElementById('connDot'),txt=document.getElementById('connText'),badge=document.getElementById('connBadge');
   try{
-    const r=await fetch(SB_URL+'/rest/v1/bids?select=id&limit=1',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-    if(r.ok){dot.className='conn-dot ok';txt.textContent='Supabase 연결됨';badge.style.borderColor='#a7f3d0';badge.style.background='#f0fdf4';}
+    const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`);
+    if(r.ok){dot.className='conn-dot ok';txt.textContent='구글 시트 연결됨';badge.style.borderColor='#a7f3d0';badge.style.background='#f0fdf4';}
     else throw new Error();
-  }catch(e){dot.className='conn-dot err';txt.textContent='서버 미연결';badge.style.borderColor='#fecaca';badge.style.background='#fef2f2';}
+  }catch(e){dot.className='conn-dot err';txt.textContent='시트 미연결';badge.style.borderColor='#fecaca';badge.style.background='#fef2f2';}
 }
 
 // ── Filter ──
