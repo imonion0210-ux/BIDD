@@ -342,15 +342,12 @@ const SHEET_ID = '1_zwovmYYRPwQqOG79wLu0OSVn0XaeHur_Fyh92IY3E4';
 const SHEET_GID = '465680672';
 
 async function loadFromSheets() {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}&headers=2`;
-  console.log('📡 구글 시트 fetch 시작:', url);
+  // range=A2:Z 로 2행부터 읽고, headers=1 로 첫번째 읽은 행(=원래 2행)을 헤더로
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}&range=A2:Z&headers=1`;
   const res = await fetch(url);
-  console.log('📡 응답 상태:', res.status, res.ok);
   const text = await res.text();
-  console.log('📡 응답 텍스트 앞부분:', text.substring(0, 200));
   const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
-  console.log('📡 파싱된 컬럼:', json.table.cols.map(c=>c.label));
-  console.log('📡 첫번째 행:', json.table.rows[0]);
+  console.log('📡 컬럼:', json.table.cols.map(c=>c.label));
   const rowsRaw = json.table.rows;
 
   // 열 순서: 공고일(0) 등록마감일(1) 개찰일시(2) 발주처(3) 용역명(4)
@@ -373,7 +370,7 @@ async function loadFromSheets() {
       openDate:  v(row, 2),
       client:    v(row, 3),
       title,
-      amount:    parseInt((v(row, 8) || '0').replace(/[^0-9]/g,'')) || 0,
+      amount:    (() => { const cell = row.c[8]; if (!cell || cell.v == null) return 0; const n = parseFloat(cell.v.toString().replace(/,/g,'')); return isNaN(n) ? 0 : Math.round(n); })(),
       result:    v(row, 9) || '-',
       winner:    v(row, 10) || '-',
       rank:      v(row, 11) || '-',
