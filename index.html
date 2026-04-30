@@ -1,849 +1,715 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>바론 입찰관리 시스템 - 실데이터 반영본</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<title>바론 입찰관리 시스템</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
-body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; }
-.chart-container { position: relative; height: 220px; width: 100%; }
-th { white-space: nowrap; background-color: #f1f5f9; }
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Pretendard',sans-serif;background:#f1f5f9;color:#1e293b;min-height:100vh}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:#f1f5f9}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:10px}
+
+/* Header */
+header{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 1px 8px rgba(0,0,0,.06)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-badge{background:#1d4ed8;color:#fff;font-size:11px;font-weight:800;padding:4px 10px;border-radius:8px;letter-spacing:.5px}
+.logo h1{font-size:15px;font-weight:700;color:#0f172a}
+.header-actions{display:flex;align-items:center;gap:10px}
+.conn-badge{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:#cbd5e1}
+.conn-dot.ok{background:#10b981;animation:none}
+.conn-dot.err{background:#ef4444;animation:none}
+.conn-dot.loading{background:#f59e0b;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.btn{padding:7px 16px;border-radius:10px;font-size:13px;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s}
+.btn-primary{background:#1d4ed8;color:#fff}
+.btn-primary:hover{background:#1e40af}
+.btn-green{background:#059669;color:#fff}
+.btn-green:hover{background:#047857}
+
+/* Main */
+main{max-width:1800px;margin:0 auto;padding:24px 28px;display:flex;flex-direction:column;gap:20px}
+
+/* Summary Cards */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.card{background:#fff;border-radius:16px;padding:20px 22px;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,.04);display:flex;flex-direction:column;gap:8px}
+.card-label{font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase}
+.card-value{font-size:26px;font-weight:900;line-height:1.1}
+.card-sub{font-size:11px;color:#94a3b8;font-weight:500}
+
+/* Card 1 - 지분액 */
+.card-amount .card-value{color:#1d4ed8}
+/* Card 2 - 참여 */
+.card-join .card-value{color:#0f172a}
+.result-pills{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px}
+.pill{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px}
+.pill-blue{background:#dbeafe;color:#1d4ed8}
+.pill-amber{background:#fef3c7;color:#b45309}
+.pill-green{background:#d1fae5;color:#065f46}
+.pill-red{background:#fee2e2;color:#b91c1c}
+
+/* Card 3 - 낙찰 (강조) */
+.card-win{background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);border-color:#1e3a8a}
+.card-win .card-label{color:#93c5fd}
+.card-win .card-value{color:#fff;font-size:40px}
+.card-win .card-sub{color:#93c5fd}
+.win-list{margin-top:6px;display:flex;flex-direction:column;gap:4px;max-height:80px;overflow-y:auto}
+.win-item{font-size:10px;color:#bfdbfe;background:rgba(255,255,255,.08);padding:4px 8px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Card 3 - 낙찰 (강조) */
+.card-win{background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);border-color:#3b82f6}
+.card-win .card-label{color:#bfdbfe}
+.card-win .card-value{color:#fff;font-size:40px}
+.card-win .card-sub{color:#bfdbfe}
+.win-list{margin-top:6px;display:flex;flex-direction:column;gap:4px;max-height:80px;overflow-y:auto}
+.win-item{font-size:10px;color:#dbeafe;background:rgba(255,255,255,.15);padding:4px 8px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Card 4 - 낙찰률 */
+.card-rate .card-value{color:#059669}
+.rate-bar-wrap{background:#e2e8f0;border-radius:10px;height:6px;overflow:hidden;margin-top:4px}
+.rate-bar{background:linear-gradient(90deg,#10b981,#059669);height:100%;border-radius:10px;transition:width .6s ease}
+
+/* Charts */
+.charts-row{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:16px}
+.chart-card{background:#fff;border-radius:16px;border:1px solid #e2e8f0;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.chart-title{font-size:12px;font-weight:700;color:#475569;margin-bottom:12px}
+.chart-wrap{position:relative;height:180px}
+
+/* Filter tabs */
+.filter-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;border:1.5px solid #e2e8f0;background:#fff;cursor:pointer;color:#64748b;transition:all .15s}
+.tab.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
+
+/* Table */
+.table-card{background:#fff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.table-header{padding:14px 20px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fafafa;flex-wrap:wrap;gap:8px}
+.table-header h3{font-size:14px;font-weight:700;color:#0f172a}
+.search-wrap{display:flex;align-items:center;gap:8px}
+.search-input{border:1.5px solid #e2e8f0;border-radius:10px;padding:7px 14px;font-size:12px;outline:none;width:260px;font-family:inherit;color:#0f172a}
+.search-input:focus{border-color:#93c5fd}
+.table-scroll{overflow-x:auto;max-height:560px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead{position:sticky;top:0;z-index:10}
+th{background:#f8fafc;padding:10px 14px;font-weight:700;color:#64748b;white-space:nowrap;border-bottom:1px solid #e2e8f0;text-align:left}
+td{padding:10px 14px;border-bottom:1px solid #f8fafc;vertical-align:middle}
+tr:hover td{background:#f8fafc}
+.mono{font-family:monospace;color:#94a3b8}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-green{background:#d1fae5;color:#065f46}
+.badge-red{background:#fee2e2;color:#b91c1c}
+.badge-amber{background:#fef3c7;color:#92400e}
+.badge-blue{background:#dbeafe;color:#1e40af}
+.badge-gray{background:#f1f5f9;color:#64748b}
+.partner-tag{display:inline-block;padding:2px 6px;border-radius:5px;font-size:9px;font-weight:700;margin:1px}
+.pt-삼안{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe}
+.pt-한맥{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0}
+.pt-바론{background:#ffedd5;color:#c2410c;border:1px solid #fed7aa}
+.pt-other{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}
+.edit-cell{cursor:pointer}
+.edit-cell:hover{background:#eff6ff}
+.edit-icon{display:none;font-size:9px;color:#93c5fd;margin-left:3px}
+.edit-cell:hover .edit-icon{display:inline}
+.inline-input{border:1.5px solid #93c5fd;border-radius:6px;padding:2px 6px;font-size:11px;outline:none;font-family:inherit;background:#fff}
+.inline-input:focus{border-color:#3b82f6}
+.btn-save-sm{background:#3b82f6;color:#fff;border:none;border-radius:5px;padding:2px 7px;font-size:9px;font-weight:700;cursor:pointer}
+.btn-cancel-sm{background:#e2e8f0;color:#475569;border:none;border-radius:5px;padding:2px 7px;font-size:9px;font-weight:700;cursor:pointer}
+.btn-del{background:none;border:none;color:#fca5a5;font-size:11px;font-weight:700;cursor:pointer;padding:2px 6px;border-radius:5px}
+.btn-del:hover{color:#ef4444;background:#fee2e2}
+.file-panel{display:flex;flex-direction:column;gap:2px}
+.file-row{display:flex;align-items:center;gap:4px}
+.file-label{font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px}
+.fl-공고{background:#dbeafe;color:#1d4ed8}
+.fl-과업{background:#ede9fe;color:#6d28d9}
+.file-btn{background:none;border:none;font-size:9px;color:#475569;cursor:pointer;text-align:left;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-btn:hover{color:#1d4ed8;text-decoration:underline}
+.file-del{background:none;border:none;color:#fca5a5;cursor:pointer;font-size:9px;display:none}
+.file-row:hover .file-del{display:inline}
+.upload-row{display:flex;gap:4px;margin-top:2px}
+.upload-btn{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;cursor:pointer;border:1px solid}
+.upload-btn-notice{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+.upload-btn-task{background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:20px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;padding:28px 32px}
+.modal h3{font-size:18px;font-weight:800;color:#0f172a;margin-bottom:20px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-full{grid-column:1/-1}
+label.form-label{display:block;font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:4px;letter-spacing:.5px}
+.form-input{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;color:#0f172a}
+.form-input:focus{border-color:#93c5fd}
+.form-select{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;color:#0f172a;background:#fff}
+.modal-actions{display:flex;gap:8px;margin-top:20px}
+.btn-modal-cancel{flex:1;padding:12px;border-radius:12px;background:#f1f5f9;color:#475569;font-weight:700;border:none;cursor:pointer;font-size:14px}
+.btn-modal-save{flex:2;padding:12px;border-radius:12px;background:#1d4ed8;color:#fff;font-weight:700;border:none;cursor:pointer;font-size:14px}
+.file-section{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-top:4px}
+.file-section h4{font-size:11px;font-weight:700;color:#64748b;margin-bottom:10px}
+.file-boxes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.file-box{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px}
+.file-box-title{font-size:10px;font-weight:700;margin-bottom:6px}
+.file-box-title.notice{color:#1d4ed8}
+.file-box-title.task{color:#6d28d9}
+
+/* Banner */
+#banner{position:fixed;bottom:20px;right:20px;z-index:9999;padding:8px 18px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;opacity:0;pointer-events:none;transition:opacity .4s;box-shadow:0 2px 12px rgba(0,0,0,.2);font-family:inherit}
 </style>
 </head>
-<body class="text-slate-800">
-<div class="min-h-screen flex flex-col">
-  <header class="bg-white border-b px-8 py-4 shadow-sm">
-    <div class="max-w-[1800px] mx-auto flex justify-between items-center">
-      <div>
-        <h1 class="text-xl font-bold text-blue-900">공공측량업 입찰관리 대시보드</h1>
-      </div>
-      <div class="flex items-center gap-3">
-        <a href="https://www.g2b.go.kr" target="_blank" rel="noopener noreferrer"
-          class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-bold transition shadow-md">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-          나라장터 바로가기
-        </a>
-        <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-bold transition shadow-md">
-          + 신규 입찰 등록
-        </button>
-      </div>
-    </div>
-  </header>
-  <main class="p-6 max-w-[1800px] mx-auto w-full space-y-6">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 lg:col-span-2">
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="font-bold text-slate-700 text-sm">참여결과</h3>
-          <div class="flex gap-4 text-[10px] font-bold text-slate-500">
-            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block"></span>삼안</span>
-            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>한맥</span>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-6">
-          <div>
-            <p class="text-[11px] font-bold text-blue-600 mb-2 text-center">🔵 삼안 참여 건</p>
-            <div class="chart-container"><canvas id="samanChart"></canvas></div>
-          </div>
-          <div>
-            <p class="text-[11px] font-bold text-emerald-600 mb-2 text-center">🟢 한맥 참여 건</p>
-            <div class="chart-container"><canvas id="hanmaekChart"></canvas></div>
-          </div>
-        </div>
-      </div>
-      <div class="grid grid-cols-2 gap-4">
-        <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex flex-col justify-center">
-          <span class="text-blue-600 text-[11px] font-bold">총 참여 지분액</span>
-          <h2 class="text-xl font-black text-blue-900 mt-1" id="total-amount">0원</h2>
-        </div>
-        <div class="bg-green-50 p-4 rounded-2xl border border-green-100 flex flex-col justify-center">
-          <span class="text-green-600 text-[11px] font-bold">참여 건수</span>
-          <h2 class="text-xl font-black text-green-900 mt-1" id="total-count">0건</h2>
-        </div>
-        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col justify-center">
-          <span class="text-slate-500 text-[11px] font-bold">타사 낙찰</span>
-          <h2 class="text-xl font-black text-slate-700 mt-1" id="lose-count">0건</h2>
-        </div>
-        <div class="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex flex-col justify-center">
-          <span class="text-amber-600 text-[11px] font-bold">불참 건수</span>
-          <h2 class="text-xl font-black text-amber-700 mt-1" id="skip-count">0건</h2>
-        </div>
-      </div>
-    </div>
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
-        <h3 class="font-bold text-slate-700">입찰 참여 상세 내역</h3>
-        <input type="text" id="search" onkeyup="renderAll()" placeholder="용역명, 발주처 검색..." class="text-sm border border-slate-200 rounded-xl px-4 py-2 w-80 outline-none focus:ring-2 focus:ring-blue-500">
-      </div>
-      <div class="overflow-x-auto max-h-[600px]">
-        <table class="w-full text-left border-collapse text-[11px]">
-          <thead class="sticky top-0 z-10 shadow-sm font-bold text-slate-500">
-            <tr>
-              <th class="px-4 py-3">공고일</th>
-              <th class="px-4 py-3">등록마감일</th>
-              <th class="px-4 py-3">개찰일시</th>
-              <th class="px-4 py-3">순위</th>
-              <th class="px-4 py-3">발주처</th>
-              <th class="px-4 py-3 min-w-[200px]">용역명</th>
-              <th class="px-4 py-3">지분금액(원)</th>
-              <th class="px-4 py-3">결과</th>
-              <th class="px-4 py-3">낙찰사</th>
-              <th class="px-4 py-3">참여사 구성</th>
-              <th class="px-4 py-3">첨부파일</th>
-              <th class="px-4 py-3 text-center">관리</th>
-            </tr>
-          </thead>
-          <tbody id="dataTable" class="divide-y divide-slate-100"></tbody>
-        </table>
-      </div>
-    </div>
-  </main>
-</div>
+<body>
 
-<!-- 모달 -->
-<div id="modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-  <div class="bg-white rounded-3xl max-w-2xl w-full p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
-    <h3 class="text-xl font-bold mb-6">입찰 데이터 관리</h3>
-    <div class="grid grid-cols-2 gap-4">
-      <input type="hidden" id="edit-id">
-      <div class="col-span-1"><label class="block text-[10px] font-bold text-slate-400">공고일</label><input type="text" id="m_post_date" class="w-full border p-2 rounded-lg text-sm"></div>
-      <div class="col-span-1"><label class="block text-[10px] font-bold text-slate-400">등록마감일</label><input type="text" id="m_date" class="w-full border p-2 rounded-lg text-sm"></div>
-      <div class="col-span-1"><label class="block text-[10px] font-bold text-slate-400">개찰일시</label><input type="text" id="m_open_date" class="w-full border p-2 rounded-lg text-sm"></div>
-      <div class="col-span-1"><label class="block text-[10px] font-bold text-slate-400">순위</label><input type="text" id="m_rank" class="w-full border p-2 rounded-lg text-sm"></div>
-      <div class="col-span-2"><label class="block text-[10px] font-bold text-slate-400">발주처</label><input type="text" id="m_client" class="w-full border p-2 rounded-lg text-sm"></div>
-      <div class="col-span-2"><label class="block text-[10px] font-bold text-slate-400">용역명</label><input type="text" id="m_title" class="w-full border p-2 rounded-lg text-sm"></div>
-      <div class="col-span-1"><label class="block text-[10px] font-bold text-slate-400">지분금액</label><input type="number" id="m_amount" class="w-full border p-2 rounded-lg text-sm"></div>
-      <div class="col-span-1"><label class="block text-[10px] font-bold text-slate-400">결과</label><input type="text" id="m_result" class="w-full border p-2 rounded-lg text-sm"></div>
-      <div class="col-span-1"><label class="block text-[10px] font-bold text-slate-400">낙찰사</label><input type="text" id="m_winner" class="w-full border p-2 rounded-lg text-sm"></div>
-      <div class="col-span-1"><label class="block text-[10px] font-bold text-slate-400">참여사 구성</label><input type="text" id="m_partners" class="w-full border p-2 rounded-lg text-sm"></div>
-      <div class="col-span-2 mt-2">
-        <div class="border border-slate-200 rounded-xl p-4 bg-slate-50">
-          <h4 class="text-[11px] font-bold text-slate-500 mb-3">첨부 파일 관리</h4>
-          <div class="grid grid-cols-2 gap-3 mb-3">
-            <div class="bg-white border border-blue-100 rounded-lg p-3">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-[11px] font-bold text-blue-700">공고문</span>
-              </div>
-              <div id="notice-files" class="space-y-1.5 min-h-[28px]"></div>
-              <label class="mt-1 flex items-center gap-1 cursor-pointer text-[10px] text-blue-500 hover:text-blue-700">
-                ↑ 파일 업로드
-                <input type="file" multiple accept=".pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" class="hidden" onchange="handleModalUpload(event,'notice-files')">
+<header>
+  <div class="logo">
+    <span class="logo-badge">BARON</span>
+    <h1>공공측량업 입찰관리 대시보드</h1>
+  </div>
+  <div class="header-actions">
+    <div class="conn-badge" id="connBadge">
+      <span class="conn-dot loading" id="connDot"></span>
+      <span id="connText">연결 확인 중...</span>
+    </div>
+    <button class="btn btn-green" onclick="window.open('https://www.g2b.go.kr','_blank')">
+      ↗ 나라장터
+    </button>
+    <button class="btn btn-primary" onclick="openModal()">+ 신규 입찰 등록</button>
+  </div>
+</header>
+
+<main>
+  <!-- Summary Cards -->
+  <div class="cards">
+    <!-- Card 1: 총 지분액 -->
+    <div class="card card-amount">
+      <div class="card-label">총 참여 지분액</div>
+      <div class="card-value" id="cardAmount">0억</div>
+      <div class="card-sub" id="cardAmountSub">—</div>
+    </div>
+    <!-- Card 2: 참여 건수 -->
+    <div class="card card-join">
+      <div class="card-label">참여 건수</div>
+      <div class="card-value" id="cardJoin">0건</div>
+      <div class="result-pills" id="cardJoinPills"></div>
+    </div>
+    <!-- Card 3: 낙찰 (강조) -->
+    <div class="card card-win">
+      <div class="card-label">🏆 낙찰 건수</div>
+      <div class="card-value" id="cardWin">0</div>
+      <div class="win-list" id="cardWinList"></div>
+    </div>
+    <!-- Card 4: 낙찰률 -->
+    <div class="card card-rate">
+      <div class="card-label">낙찰률</div>
+      <div class="card-value" id="cardRate">0%</div>
+      <div class="rate-bar-wrap"><div class="rate-bar" id="rateBar" style="width:0%"></div></div>
+      <div class="card-sub" id="cardRateSub">낙찰 0 / 결과확정 0건</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">🔵 삼안 참여 결과</div>
+      <div class="chart-wrap"><canvas id="samanChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">🟢 한맥 참여 결과</div>
+      <div class="chart-wrap"><canvas id="hanmaekChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">📅 월별 참여 건수</div>
+      <div class="chart-wrap"><canvas id="monthChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card">
+    <div class="table-header">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <h3>입찰 참여 상세 내역</h3>
+        <div class="filter-tabs" id="filterTabs">
+          <button class="tab active" onclick="setFilter('all',this)">전체</button>
+          <button class="tab" onclick="setFilter('진행중',this)">진행중</button>
+          <button class="tab" onclick="setFilter('낙찰',this)">낙찰</button>
+          <button class="tab" onclick="setFilter('타사낙찰',this)">타사낙찰</button>
+          <button class="tab" onclick="setFilter('불참',this)">불참</button>
+        </div>
+      </div>
+      <input class="search-input" id="searchInput" placeholder="용역명, 발주처 검색..." oninput="renderAll()">
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>공고일</th><th>마감일</th><th>개찰일시</th><th>순위</th>
+            <th>발주처</th><th style="min-width:200px">용역명</th>
+            <th>지분금액</th><th>결과</th><th>낙찰사</th>
+            <th>참여사</th><th>첨부파일</th><th style="text-align:center">관리</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">신규 입찰 등록</h3>
+    <input type="hidden" id="mId">
+    <div class="form-grid">
+      <div><label class="form-label">공고일</label><input class="form-input" id="mPostDate" placeholder="YYYY-MM-DD"></div>
+      <div><label class="form-label">등록마감일</label><input class="form-input" id="mDate" placeholder="YYYY-MM-DD"></div>
+      <div><label class="form-label">개찰일시</label><input class="form-input" id="mOpenDate" placeholder="개찰일시"></div>
+      <div><label class="form-label">순위</label><input class="form-input" id="mRank" placeholder="예: 3위"></div>
+      <div class="form-full"><label class="form-label">발주처</label><input class="form-input" id="mClient"></div>
+      <div class="form-full"><label class="form-label">용역명</label><input class="form-input" id="mTitle"></div>
+      <div><label class="form-label">지분금액 (원)</label><input class="form-input" id="mAmount" type="number"></div>
+      <div><label class="form-label">결과</label>
+        <select class="form-select" id="mResult">
+          <option value="-">진행중</option>
+          <option value="낙찰">낙찰</option>
+          <option value="당사낙찰">당사낙찰</option>
+          <option value="타사낙찰">타사낙찰</option>
+          <option value="불참">불참</option>
+        </select>
+      </div>
+      <div><label class="form-label">낙찰사</label><input class="form-input" id="mWinner" placeholder="-"></div>
+      <div><label class="form-label">참여사 구성</label><input class="form-input" id="mPartners" placeholder="삼안:한맥:바론"></div>
+      <div class="form-full">
+        <div class="file-section">
+          <h4>첨부 파일</h4>
+          <div class="file-boxes">
+            <div class="file-box">
+              <div class="file-box-title notice">공고문</div>
+              <div id="mNoticeFiles"></div>
+              <label style="font-size:10px;color:#1d4ed8;cursor:pointer;font-weight:700">
+                ↑ 파일 추가
+                <input type="file" multiple style="display:none" onchange="handleModalFile(event,'notice')">
               </label>
             </div>
-            <div class="bg-white border border-violet-100 rounded-lg p-3">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-[11px] font-bold text-violet-700">과업지시서</span>
-              </div>
-              <div id="task-files" class="space-y-1.5 min-h-[28px]"></div>
-              <label class="mt-1 flex items-center gap-1 cursor-pointer text-[10px] text-violet-500 hover:text-violet-700">
-                ↑ 파일 업로드
-                <input type="file" multiple accept=".pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" class="hidden" onchange="handleModalUpload(event,'task-files')">
+            <div class="file-box">
+              <div class="file-box-title task">과업지시서</div>
+              <div id="mTaskFiles"></div>
+              <label style="font-size:10px;color:#6d28d9;cursor:pointer;font-weight:700">
+                ↑ 파일 추가
+                <input type="file" multiple style="display:none" onchange="handleModalFile(event,'task')">
               </label>
             </div>
           </div>
         </div>
       </div>
-      <div class="col-span-2 flex gap-2 mt-4">
-        <button type="button" onclick="closeModal()" class="flex-1 bg-slate-100 py-3 rounded-xl font-bold">취소</button>
-        <button type="button" onclick="submitForm()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold">저장</button>
-      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeModal()">취소</button>
+      <button class="btn-modal-save" onclick="submitForm()">저장</button>
     </div>
   </div>
 </div>
 
+<div id="banner"></div>
+
 <script>
-const SUPABASE_URL = 'https://peawevlcywmaadvigoug.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlYXdldmxjeXdtYWFkdmlnb3VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTAwMDQsImV4cCI6MjA5MjkyNjAwNH0.DB__CEJh3iUbyAchY8OIryoGTJcxeO1gEZt2upXzOlA';
+const SB_URL = 'https://peawevlcywmaadvigoug.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlYXdldmxjeXdtYWFkdmlnb3VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTAwMDQsImV4cCI6MjA5MjkyNjAwNH0.DB__CEJh3iUbyAchY8OIryoGTJcxeO1gEZt2upXzOlA';
+const LS_KEY = 'baron_v2_bids';
+const BUCKET = 'bid-files';
 
-async function sbFetch(path, options = {}) {
-  const res = await fetch(SUPABASE_URL + path, {
-    ...options,
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation',
-      ...(options.headers || {})
-    }
-  });
-  if (res.status === 204) return [];
-  const text = await res.text();
-  if (!text || text.trim() === '') return [];
-  return JSON.parse(text);
-}
+// ── Google Sheets 연동 설정 ──
+// ↓↓↓ Apps Script 배포 후 여기에 URL을 붙여넣으세요 ↓↓↓
+const GAS_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
 
-// ───── localStorage 캐시 헬퍼 ─────
-const LS_KEY = 'baron_bids_cache';
-
-function saveToCache(data) {
+async function syncToSheets(data) {
+  if (!GAS_URL || GAS_URL === 'YOUR_APPS_SCRIPT_URL_HERE') return;
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(data));
+    await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'write', data: data }),
+    });
+    showBanner('📊 구글 시트 동기화 완료', '#059669');
   } catch(e) {
-    console.warn('[Cache] 저장 실패 (용량 초과일 수 있음):', e);
-    // 첨부파일 데이터 제외하고 저장 재시도
-    try {
-      const slim = data.map(b => ({...b, noticeFiles: b.noticeFiles?.map(f=>({name:f.name||f})) || [], taskFiles: b.taskFiles?.map(f=>({name:f.name||f})) || []}));
-      localStorage.setItem(LS_KEY, JSON.stringify(slim));
-    } catch(e2) { console.warn('[Cache] 슬림 저장도 실패:', e2); }
+    showBanner('⚠️ 구글 시트 동기화 실패', '#b45309');
   }
 }
 
-function loadFromCache() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch(e) { return null; }
+let bids = [], activeFilter = 'all', samanCh, hanmaekCh, monthCh;
+let modalFiles = {notice:[], task:[]}, pendingFiles = {notice:[], task:[]};
+
+// ── Supabase helpers ──
+async function sbFetch(path, opts={}) {
+  const res = await fetch(SB_URL + path, {
+    ...opts,
+    headers: {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation',...(opts.headers||{})}
+  });
+  if (res.status===204) return [];
+  const t = await res.text();
+  return t ? JSON.parse(t) : [];
 }
-
-function showBanner(msg, color = '#1e40af') {
-  let el = document.getElementById('_syncBanner');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = '_syncBanner';
-    el.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 18px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;pointer-events:none;transition:opacity 0.5s;font-family:Pretendard,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,0.2)';
-    document.body.appendChild(el);
-  }
-  el.style.background = color;
-  el.textContent = msg;
-  el.style.opacity = '1';
-  clearTimeout(el._t);
-  el._t = setTimeout(() => { el.style.opacity = '0'; }, 2500);
+function parse(r) {
+  return {id:r.id,postDate:r.post_date||'',date:r.date||'',openDate:r.open_date||'',rank:r.rank||'',client:r.client||'',title:r.title||'',amount:r.amount||0,result:r.result||'-',winner:r.winner||'-',partners:r.partners||'',noticeFiles:r.notice_files?JSON.parse(r.notice_files):[],taskFiles:r.task_files?JSON.parse(r.task_files):[]};
 }
-// ─────────────────────────────────
+function saveCache(d) { try { localStorage.setItem(LS_KEY,JSON.stringify(d)); } catch(e){} }
+function loadCache() { try { const r=localStorage.getItem(LS_KEY); return r?JSON.parse(r):null; } catch(e){return null;} }
 
-function parseRow(row) {
-  return {
-    id: row.id,
-    postDate: row.post_date || '',
-    date: row.date || '',
-    openDate: row.open_date || '',
-    rank: row.rank || '',
-    client: row.client || '',
-    title: row.title || '',
-    amount: row.amount || 0,
-    result: row.result || '',
-    winner: row.winner || '',
-    partners: row.partners || '',
-    noticeFiles: row.notice_files ? JSON.parse(row.notice_files) : [],
-    taskFiles: row.task_files ? JSON.parse(row.task_files) : []
-  };
-}
-
-async function loadFromSupabase() {
-  const cached = loadFromCache();
-
+async function loadData() {
+  const cache = loadCache();
   try {
     const data = await sbFetch('/rest/v1/bids?select=*&order=post_date.desc');
-
-    if (!Array.isArray(data) || data.length === 0) {
-      // Supabase가 비어있고 로컬에 데이터 있으면 복원
-      if (cached && cached.length > 0) {
-        showBanner('⏫ 로컬 데이터를 서버에 복원 중...', '#1d4ed8');
-        await saveAllToSupabase(cached);
-        return cached;
-      }
-      await saveAllToSupabase(initialData);
-      return initialData.map(b => ({...b}));
+    if (!Array.isArray(data)||data.length===0) {
+      if (cache&&cache.length>0){showBanner('⏫ 로컬 데이터 복원 중...','#1d4ed8');await saveAll(cache);return cache;}
+      await saveAll(INIT);return INIT.map(b=>({...b}));
     }
-
-    const fromServer = data.map(parseRow);
-
-    // 캐시 건수가 더 많으면 로컬이 더 최신 (서버 저장이 일부 실패한 케이스)
-    if (cached && cached.length > fromServer.length) {
-      showBanner('⏫ 로컬 데이터를 서버에 동기화 중...', '#1d4ed8');
-      await saveAllToSupabase(cached);
-      return cached;
-    }
-
-    saveToCache(fromServer);
-    return fromServer;
-
+    const fromSv = data.map(parse);
+    if (cache&&cache.length>fromSv.length){showBanner('⏫ 동기화 중...','#1d4ed8');await saveAll(cache);return cache;}
+    saveCache(fromSv);return fromSv;
   } catch(e) {
-    console.warn('[Supabase] 로드 실패, 캐시 사용:', e);
-    if (cached && cached.length > 0) {
-      showBanner('⚠️ 오프라인 — 로컬 데이터 표시 중', '#b45309');
-      return cached;
-    }
-    showBanner('⚠️ 연결 실패 — 기본 데이터 표시 중', '#b91c1c');
-    return initialData.map(b => ({...b}));
+    showBanner('⚠️ 오프라인 — 로컬 데이터 표시','#b45309');
+    return cache&&cache.length>0?cache:INIT.map(b=>({...b}));
   }
 }
 
-async function saveAllToSupabase(data) {
-  // 1. 항상 먼저 로컬에 저장
-  saveToCache(data);
-  showBanner('✓ 저장됨', '#1e40af');
-
+async function saveAll(data) {
+  saveCache(data);
+  syncToSheets(data); // ← 구글 시트 자동 동기화
+  showBanner('✓ 저장됨','#059669');
   try {
-    // 2. 메타데이터 upsert (첨부파일 제외 → 용량 작음)
-    const metaRows = data.map(b => ({
-      id: b.id,
-      post_date: b.postDate || '',
-      date: b.date || '',
-      open_date: b.openDate || '',
-      rank: b.rank || '',
-      client: b.client || '',
-      title: b.title || '',
-      amount: b.amount || 0,
-      result: b.result || '',
-      winner: b.winner || '',
-      partners: b.partners || ''
-    }));
-    await sbFetch('/rest/v1/bids', {
-      method: 'POST',
-      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(metaRows)
-    });
-
-    // 3. 첨부파일 있는 항목만 개별 PATCH
-    const withFiles = data.filter(b => (b.noticeFiles||[]).length > 0 || (b.taskFiles||[]).length > 0);
-    for (const b of withFiles) {
-      await sbFetch('/rest/v1/bids?id=eq.' + b.id, {
-        method: 'PATCH',
-        headers: { 'Prefer': 'return=minimal' },
-        body: JSON.stringify({
-          notice_files: JSON.stringify(b.noticeFiles || []),
-          task_files: JSON.stringify(b.taskFiles || [])
-        })
-      });
+    const rows = data.map(b=>({id:b.id,post_date:b.postDate||'',date:b.date||'',open_date:b.openDate||'',rank:b.rank||'',client:b.client||'',title:b.title||'',amount:b.amount||0,result:b.result||'-',winner:b.winner||'-',partners:b.partners||''}));
+    await sbFetch('/rest/v1/bids',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(rows)});
+    const wf = data.filter(b=>(b.noticeFiles||[]).length>0||(b.taskFiles||[]).length>0);
+    for(const b of wf){
+      await sbFetch('/rest/v1/bids?id=eq.'+b.id,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({notice_files:JSON.stringify(b.noticeFiles||[]),task_files:JSON.stringify(b.taskFiles||[])})});
     }
-
-    // 4. 로컬에서 삭제된 항목 Supabase에서도 삭제 (실패해도 무시)
-    try {
-      const remoteIds = (await sbFetch('/rest/v1/bids?select=id')).map(r => r.id);
-      const localIds = new Set(data.map(b => b.id));
-      for (const rid of remoteIds) {
-        if (!localIds.has(rid)) {
-          await sbFetch('/rest/v1/bids?id=eq.' + rid, { method: 'DELETE', headers: { 'Prefer': '' } });
-        }
-      }
-    } catch(e2) { console.warn('[Supabase] 삭제 동기화 실패 (무시):', e2); }
-
-  } catch(e) {
-    console.warn('[Supabase] 저장 실패 (로컬에는 저장됨):', e);
-    showBanner('⚠️ 서버 저장 실패 — 로컬에만 저장됨', '#b45309');
-  }
+    try{
+      const remIds=(await sbFetch('/rest/v1/bids?select=id')).map(r=>r.id);
+      const locIds=new Set(data.map(b=>b.id));
+      for(const rid of remIds){if(!locIds.has(rid)){await sbFetch('/rest/v1/bids?id=eq.'+rid,{method:'DELETE',headers:{'Prefer':''}});}}
+    }catch(e2){}
+  } catch(e){showBanner('⚠️ 서버 저장 실패 (로컬 저장됨)','#b45309');}
 }
 
-const initialData = [
-  { id: 1, postDate: '2025-12-31', date: '2026-01-13', openDate: '2026-02-12', rank: '14위', client: '연천군맑은물관리사업소', title: '청산배수지건설공사기본및실시설계용역', amount: 73384542, result: '타사낙찰', winner: '동명', partners: '삼안:한맥:바론:경수', noticeFiles: [], taskFiles: [] },
-  { id: 2, postDate: '2025-12-30', date: '2026-01-06', openDate: '-', rank: '-', client: '경기도 포천시', title: '포천천 인도교 설치사업 기본 및 실시설계 용역', amount: 13824580, result: '불참', winner: '-', partners: '삼안 : XX : 바론 : XX', noticeFiles: [], taskFiles: [] },
-  { id: 3, postDate: '2025-12-30', date: '2026-01-06', openDate: '2026-01-07(11시)', rank: '22위', client: '경기도 김포시', title: '하성농어촌도로리도207호선개설사업기본및실시설계용역', amount: 138988300, result: '타사낙찰', winner: '경동', partners: '삼안:주하:바론:에스피', noticeFiles: [], taskFiles: [] },
-  { id: 4, postDate: '2026-01-05', date: '2026-01-20', openDate: '2026-02-27(11시)', rank: '21위', client: '경상남도 진주시', title: '진주시 나불지구 풍수해생활권 종합정비사업 기본 및 실시설계', amount: 419903300, result: '타사낙찰', winner: '유신', partners: '한맥+혜인+바론+세경', noticeFiles: [], taskFiles: [] },
-  { id: 5, postDate: '2026-01-07', date: '2026-01-19', openDate: '2026-02-12(11시)', rank: '10위', client: '양평군환경사업소', title: '양평군 노후하수관로 정비사업 실시설계 용역', amount: 213023041, result: '타사낙찰', winner: '이산', partners: '삼안:다산:바론', noticeFiles: [], taskFiles: [] },
-  { id: 6, postDate: '2025-12-30', date: '2026-01-16', openDate: '2026-02-12(13시)', rank: '2위', client: '금강유역환경청', title: "금강 하천시설 유지보수 실시설계용역('26~'28년)", amount: 74500000, result: '타사낙찰', winner: '도화', partners: '삼안:한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 7, postDate: '2026-02-09', date: '-', openDate: '-', rank: '-', client: '서울특별시', title: '탄천.한강변차집관로정비공사기본및실시설계용역(협상)', amount: 0, result: '불참', winner: '-', partners: '0', noticeFiles: [], taskFiles: [] },
-  { id: 8, postDate: '2026-01-28', date: '2026-02-06', openDate: '2026-02-09 (11시)', rank: '16위', client: '경기도 파주시', title: '수내천(소하천)정비사업 기본 및 실시설계용역', amount: 73575600, result: '타사낙찰', winner: '건일', partners: '삼안:한맥:바론:GSTA', noticeFiles: [], taskFiles: [] },
-  { id: 9, postDate: '2026-02-20', date: '2026-03-05', openDate: '-', rank: '-', client: '구례군', title: '구례군 소하천정비종합계획수립 및 지형도면신고시 용역', amount: 0, result: '불참', winner: '-', partners: '한맥 : XX : 바론 : XX', noticeFiles: [], taskFiles: [] },
-  { id: 10, postDate: '2026-02-26', date: '2026-03-04', openDate: '2026-03-05 (15시)', rank: '-', client: '경기도청북부청사', title: '경기북부양생동물 생태관찰원조성사업기본및실시설계용역', amount: 32087000, result: '타사낙찰', winner: '도화', partners: '삼안 : 75.7 : 바론 : 10', noticeFiles: [], taskFiles: [] },
-  { id: 11, postDate: '2026-01-13', date: '2026-01-26', openDate: '2026-03-12(11시)', rank: '-', client: '평택시', title: '평택시통복천생태하천복원실시설계용역(장기계속계약)', amount: 147096500, result: '타사낙찰', winner: '한종', partners: '삼안:한맥:바론:에스피', noticeFiles: [], taskFiles: [] },
-  { id: 12, postDate: '2026-02-02', date: '2026-02-13', openDate: '-', rank: '-', client: '안양시', title: '안양시분류식하수관로및노후하수관로정비공사기본및실시설계용역', amount: 87369568, result: '타사낙찰', winner: '한종', partners: '삼안:태조:바론:GSTA', noticeFiles: [], taskFiles: [] },
-  { id: 13, postDate: '2026-02-05', date: '2026-02-25', openDate: '-', rank: '-', client: '용인특례시', title: '왕산.갈담자연재해위험개선지구정비사업기본및실시설계용역', amount: 187304000, result: '당사낙찰', winner: '-', partners: '삼안:한맥:바론:GSTA', noticeFiles: [], taskFiles: [] },
-  { id: 14, postDate: '2026-02-05', date: '2026-02-20', openDate: '-', rank: '-', client: '파주시', title: '파주시소하천정비종합계획재수립용역', amount: 730908000, result: '타사낙찰', winner: '건화', partners: '삼안:한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 15, postDate: '2026-02-10', date: '2026-02-24', openDate: '-', rank: '-', client: '경기도광주시', title: '초월지구풍수해생활권종합정비사업기본및실시설계용역', amount: 124457048, result: '-', winner: '-', partners: '삼안:한맥:바론:에스피', noticeFiles: [], taskFiles: [] },
-  { id: 16, postDate: '2026-02-10', date: '2026-02-24', openDate: '-', rank: '-', client: '평택시상하수도사업소', title: '평택시북부지역노후상수관망정비사업기본및실시설계용역', amount: 235800000, result: '타사낙찰', winner: '건화', partners: '삼안:바론=분담', noticeFiles: [], taskFiles: [] },
-  { id: 17, postDate: '2026-02-11', date: '2026-02-25', openDate: '-', rank: '-', client: '안양시', title: '안양시 노후상수관망정비사업실시설계용역', amount: 214975347, result: '타사낙찰', winner: '건화', partners: '삼안:태조:바론:에스피', noticeFiles: [], taskFiles: [] },
-  { id: 18, postDate: '2026-02-26', date: '2026-03-10', openDate: '3월 중', rank: '-', client: '김해시', title: '김해시 소하천 정비종합계획 재수립 및 지형도면고시용역', amount: 625616320, result: '타사낙찰', winner: 'KCI', partners: '한맥 : XX : 바론 : XX', noticeFiles: [], taskFiles: [] },
-  { id: 19, postDate: '2026-02-27', date: '2026-03-10', openDate: '3월 중', rank: '-', client: '홍성군', title: '충남 어사 자연재해위험개선지구 정비사업 기본 및 실시설계', amount: 119743911, result: '-', winner: '-', partners: '한맥 : XX : 바론 : XX', noticeFiles: [], taskFiles: [] },
-  { id: 20, postDate: '2026-03-03', date: '2026-03-13', openDate: '3월 중', rank: '-', client: '함안군', title: '유동 자연재해위험개선지구 정비사업 기본 및 실시설계용역', amount: 64688400, result: '-', winner: '-', partners: '한맥 : XX : 바론 : XX', noticeFiles: [], taskFiles: [] },
-  { id: 21, postDate: '2026-02-24', date: '2026-03-10', openDate: '3월 중', rank: '-', client: '양평군환경사업소', title: '국수 공공하수처리시설 증설사업 기본 및 실시설계 용역', amount: 5946600, result: '-', winner: '-', partners: '삼안:한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 22, postDate: '2026-03-10', date: '2026-03-25', openDate: '미정', rank: '-', client: '세종특별자치시', title: '세종 스마트 국가산단 진입도로 건설공사 기본 및 실시설계용역', amount: 104850000, result: '-', winner: '-', partners: '한맥:바론:XX지질', noticeFiles: [], taskFiles: [] },
-  { id: 23, postDate: '2026-03-16', date: '2026-03-27', openDate: '-', rank: '-', client: '가평군', title: '가평군 소하천정비종합계획 및 지형도면고시 용역', amount: 220493962, result: '-', winner: '-', partners: '삼안:한맥:바론=70:30:측량', noticeFiles: [], taskFiles: [] },
-  { id: 24, postDate: '2026-03-09', date: '2026-04-16', openDate: '2026/04/16 14:00', rank: '-', client: '국가철도공단', title: '수도권광역급행철도 A노선 연장운행 사업 노반, 궤도 기본 및 실시설계 엔지니어링', amount: 0, result: '-', winner: '-', partners: '삼안:바론', noticeFiles: [], taskFiles: [] },
-  { id: 25, postDate: '2026-03-24', date: '2026-04-03', openDate: '2026/04/03 18:00:00', rank: '-', client: '경상남도 고성군', title: '고성군 소하천정비종합계획 재수립 및 지형도면고시 용역(동부권역)', amount: 0, result: '-', winner: '-', partners: '삼안:바론', noticeFiles: [], taskFiles: [] },
-  { id: 26, postDate: '2026-03-24', date: '2026-04-03', openDate: '-', rank: '-', client: '경상남도 고성군', title: '고성군 소하천정비종합계획 재수립 및 지형도면고시 용역(서부권역)', amount: 0, result: '-', winner: '-', partners: '삼안:바론', noticeFiles: [], taskFiles: [] },
-  { id: 27, postDate: '2026-03-25', date: '2026-04-15', openDate: '-', rank: '-', client: '평택지방해양수산청', title: '평택당진항배수로호안보강공사실시설계용역', amount: 40000000, result: '-', winner: '-', partners: '삼안:바론', noticeFiles: [], taskFiles: [] },
-  { id: 28, postDate: '2026-03-30', date: '2026-04-08', openDate: '-', rank: '-', client: '파주시', title: '야당동하수도정비중점관리지역도시침수대응사업기본및실시설계', amount: 235280100, result: '-', winner: '-', partners: '삼안:바론', noticeFiles: [], taskFiles: [] },
-  { id: 29, postDate: '2026-03-30', date: '2026-04-03', openDate: '-', rank: '-', client: '경기평택항만공사', title: '평택당진항액체부두통합유지준설기본및실시설계용역', amount: 84675000, result: '-', winner: '-', partners: '삼안:바론', noticeFiles: [], taskFiles: [] },
-  { id: 30, postDate: '2026-04-06', date: '2026-04-15', openDate: '-', rank: '-', client: '충청남도 부여군', title: '합곡원문 자연재해위험개선지구 정비사업 기본 및 실시설계용역', amount: 216148914, result: '-', winner: '-', partners: '한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 31, postDate: '2026-04-07', date: '2026-04-15', openDate: '-', rank: '-', client: '충청남도 부여군', title: '정암 풍수해생활권 종합정비사업 기본 및 실시설계용역', amount: 210699665, result: '-', winner: '-', partners: '한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 32, postDate: '2026-04-07', date: '2026-04-15', openDate: '-', rank: '-', client: '충청남도 부여군', title: '함양 자연재해위험개선지구 정비사업 기본 및 실시설계용역', amount: 128803340, result: '-', winner: '-', partners: '한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 33, postDate: '2026-04-07', date: '2026-04-15', openDate: '-', rank: '-', client: '충청남도 당진시', title: '검암지구 자연재해위험개선지구 기본 및 실시설계 용역', amount: 635614397, result: '-', winner: '-', partners: '한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 34, postDate: '2026-04-08', date: '2026-04-16', openDate: '-', rank: '-', client: '서울지방국토관리청', title: '국도46호선 남양주(왕숙지구)도로확장공사 실시설계용역', amount: 0, result: '-', winner: '-', partners: '한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 35, postDate: '2026-04-08', date: '2026-04-13', openDate: '-', rank: '-', client: '경상북도 경주시', title: '대천8지구풍수해생활권종합정비사업기본및실시설계용역(총괄분)', amount: 78956900, result: '-', winner: '-', partners: '한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 36, postDate: '2026-04-08', date: '2026-04-13', openDate: '-', rank: '-', client: '경상북도 경주시', title: '외동동천자연재해위험개선지구정비사업기본및실시설계용역(총괄분)', amount: 249876000, result: '-', winner: '-', partners: '한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 37, postDate: '2026-04-09', date: '2026-04-24', openDate: '2026년 6월 중', rank: '-', client: '진주시', title: '진주시 소하천정비종합계획(변경) 및 지형도면 고시 용역', amount: 713912000, result: '-', winner: '-', partners: '한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 38, postDate: '2026-03-17', date: '-', openDate: '-', rank: '-', client: '인제군', title: '빙어호 인도교 조성사업 기본설계 용역', amount: 36595500, result: '타사낙찰', winner: '바우', partners: '한맥:바론', noticeFiles: [], taskFiles: [] },
-  { id: 39, postDate: '2026-01-02', date: '2026-03-25', openDate: '-', rank: '-', client: '정읍시', title: '정읍시 가축분뇨공공처리시설(우분연료화)설치사업 환경영향평가 용역', amount: 276357000, result: '타사낙찰', winner: '도화', partners: '한맥:바론', noticeFiles: [], taskFiles: [] }
-];
-
-let bids = [];
-let samanChart, hanmaekChart;
-
-async function initApp() {
-  bids = await loadFromSupabase();
-  renderAll();
-}
-
-function renderAll() {
-  const query = document.getElementById('search').value.toLowerCase();
-  const filtered = bids
-    .filter(b => b.title.toLowerCase().includes(query) || b.client.toLowerCase().includes(query))
-    .sort((a, b) => (b.postDate || '').localeCompare(a.postDate || ''));
-  renderTable(filtered);
-  renderStats(filtered);
-  renderCharts(filtered);
-}
-
-const PARTNER_STYLES = {
-  '삼안': 'bg-blue-100 text-blue-800 border border-blue-200',
-  '한맥': 'bg-emerald-100 text-emerald-800 border border-emerald-200',
-  '바론': 'bg-orange-100 text-orange-800 border border-orange-200',
-};
-
-function renderPartners(str) {
-  if (!str || str === '0') return '<span class="text-slate-300">-</span>';
-  const names = str.split(/[:+,\s]+/).map(s => s.trim()).filter(s => s && s !== 'XX');
-  return names.map(name => {
-    const style = PARTNER_STYLES[name] || 'bg-slate-100 text-slate-600 border border-slate-200';
-    return `<span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${style}">${name}</span>`;
-  }).join(' ');
-}
-
-function startEditPartners(bidId, td) {
-  if (td.querySelector('input')) return;
-  const b = bids.find(x => x.id === bidId);
-  if (!b) return;
-  const current = b.partners && b.partners !== '0' ? b.partners : '';
-  td.innerHTML = `
-    <div class="flex items-center gap-1">
-      <input id="pe_${bidId}" type="text" value="${current}"
-        class="border border-blue-300 rounded px-1.5 py-0.5 text-[11px] w-36 focus:outline-none focus:ring-1 focus:ring-blue-400"
-        placeholder="삼안:한맥:바론"
-        onkeydown="if(event.key==='Enter') savePartners(${bidId}); if(event.key==='Escape') renderAll();"
-      />
-      <button onclick="savePartners(${bidId})" class="text-[9px] bg-blue-500 text-white rounded px-1.5 py-0.5 hover:bg-blue-600">저장</button>
-      <button onclick="renderAll()" class="text-[9px] bg-slate-200 text-slate-600 rounded px-1.5 py-0.5 hover:bg-slate-300">취소</button>
-    </div>`;
-  td.querySelector('input').focus();
-}
-
-async function savePartners(bidId) {
-  const input = document.getElementById('pe_' + bidId);
-  if (!input) return;
-  const b = bids.find(x => x.id === bidId);
-  if (!b) return;
-  b.partners = input.value.trim() || '0';
-  await saveAllToSupabase(bids);
-  renderAll();
-}
-
-// ───── Supabase Storage 파일 업로드 ─────
-const STORAGE_BUCKET = 'bid-files';
-
-async function uploadToStorage(bidId, type, file) {
-  // 1차: Supabase Storage 시도
+async function uploadFile(bidId, type, file) {
   try {
     const path = `${bidId}/${type}/${Date.now()}_${file.name}`;
-    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
-        'Content-Type': file.type || 'application/octet-stream',
-        'x-upsert': 'true'
-      },
-      body: file
-    });
-    if (res.ok) {
-      return { name: file.name, path, mime: file.type };
-    }
-    console.warn('[Storage] 업로드 실패 (' + res.status + '), Base64 fallback 사용');
-  } catch(e) {
-    console.warn('[Storage] 네트워크 오류, Base64 fallback:', e);
-  }
-  // 2차: Base64 fallback
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve({ name: file.name, data: reader.result, mime: file.type });
-    reader.onerror = () => reject(new Error('파일 읽기 실패'));
-    reader.readAsDataURL(file);
-  });
+    const res = await fetch(`${SB_URL}/storage/v1/object/${BUCKET}/${path}`,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},body:file});
+    if(res.ok) return {name:file.name,path,mime:file.type};
+  } catch(e){}
+  return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve({name:file.name,data:r.result,mime:file.type});r.onerror=()=>reject();r.readAsDataURL(file);});
 }
 
-async function deleteFromStorage(path) {
-  await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${path}`, {
-    method: 'DELETE',
-    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
-  });
+function getFileUrl(f){return f.path?`${SB_URL}/storage/v1/object/public/${BUCKET}/${f.path}`:f.data||null;}
+function getFileName(f){return typeof f==='string'?f:f.name;}
+
+// ── Banner ──
+let bannerTimer;
+function showBanner(msg,color='#1d4ed8'){
+  const el=document.getElementById('banner');
+  el.textContent=msg;el.style.background=color;el.style.opacity='1';
+  clearTimeout(bannerTimer);bannerTimer=setTimeout(()=>{el.style.opacity='0';},2500);
 }
 
-function getStorageUrl(path) {
-  return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
+// ── Connection check ──
+async function checkConn(){
+  const dot=document.getElementById('connDot'),txt=document.getElementById('connText'),badge=document.getElementById('connBadge');
+  try{
+    const r=await fetch(SB_URL+'/rest/v1/bids?select=id&limit=1',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    if(r.ok){dot.className='conn-dot ok';txt.textContent='Supabase 연결됨';badge.style.borderColor='#a7f3d0';badge.style.background='#f0fdf4';}
+    else throw new Error();
+  }catch(e){dot.className='conn-dot err';txt.textContent='서버 미연결';badge.style.borderColor='#fecaca';badge.style.background='#fef2f2';}
 }
 
-function triggerUpload(bidId, type) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.multiple = true;
-  input.accept = '.pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png';
-  input.onchange = async () => {
-    const files = Array.from(input.files);
-    if (!files.length) return;
-    const b = bids.find(x => x.id === bidId);
-    if (!b) return;
-    showBanner('⏫ 파일 업로드 중...', '#1d4ed8');
-    try {
-      for (const file of files) {
-        const fileObj = await uploadToStorage(bidId, type, file);
-        if (type === 'notice') b.noticeFiles = [...(b.noticeFiles || []), fileObj];
-        else b.taskFiles = [...(b.taskFiles || []), fileObj];
-      }
-      await saveAllToSupabase(bids);
-      renderAll();
-      showBanner('✓ 파일 업로드 완료', '#059669');
-    } catch(e) {
-      console.error('파일 업로드 실패:', e);
-      showBanner('⚠️ 파일 업로드 실패', '#b91c1c');
-    }
-  };
-  input.click();
-}
-
-function downloadFile(bidId, type, idx) {
-  const b = bids.find(x => x.id === bidId);
-  if (!b) return;
-  const f = (type === 'notice' ? b.noticeFiles : b.taskFiles)[idx];
-  if (!f) return;
-  // Storage URL 방식
-  if (f.path) {
-    window.open(getStorageUrl(f.path), '_blank');
-    return;
-  }
-  // 구 base64 방식 fallback
-  if (f.data) {
-    const a = document.createElement('a');
-    a.href = f.data;
-    a.download = f.name;
-    a.click();
-    return;
-  }
-  alert('파일을 찾을 수 없습니다: ' + f.name);
-}
-
-async function removeFile(bidId, type, idx) {
-  const b = bids.find(x => x.id === bidId);
-  if (!b) return;
-  const arr = type === 'notice' ? b.noticeFiles : b.taskFiles;
-  const f = arr[idx];
-  if (f && f.path) {
-    try { await deleteFromStorage(f.path); } catch(e) { console.warn('스토리지 삭제 실패:', e); }
-  }
-  arr.splice(idx, 1);
-  await saveAllToSupabase(bids);
+// ── Filter ──
+function setFilter(f, el){
+  activeFilter=f;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
   renderAll();
 }
 
-function getFileName(f) { return typeof f === 'string' ? f : f.name; }
-
-function renderFilePanel(b) {
-  const nf = b.noticeFiles || [];
-  const tf = b.taskFiles || [];
-  const renderRow = (f, i, type, color, label) => `
-    <div class="flex items-center gap-1 group min-w-0">
-      <span class="text-[9px] font-bold ${color === 'blue' ? 'text-blue-500 bg-blue-50' : 'text-violet-500 bg-violet-50'} px-1 rounded flex-shrink-0">${label}</span>
-      <button onclick="downloadFile(${b.id},'${type}',${i})" class="text-[9px] text-slate-600 hover:text-blue-600 hover:underline truncate max-w-[110px] text-left" title="${getFileName(f)}">${getFileName(f)}</button>
-      <button onclick="removeFile(${b.id},'${type}',${i})" class="hidden group-hover:inline flex-shrink-0 text-red-400 hover:text-red-600 text-[10px] leading-none ml-auto">✕</button>
-    </div>`;
-  return `
-    <div class="flex flex-col gap-0.5 min-w-0">
-      ${nf.map((f, i) => renderRow(f, i, 'notice', 'blue', '공고')).join('')}
-      ${tf.map((f, i) => renderRow(f, i, 'task', 'violet', '과업')).join('')}
-      ${nf.length === 0 && tf.length === 0 ? '<span class="text-[9px] text-slate-300">없음</span>' : ''}
-      <div class="flex gap-1 mt-0.5">
-        <button onclick="triggerUpload(${b.id},'notice')" class="text-[9px] text-blue-400 hover:text-blue-600 font-bold border border-blue-200 rounded px-1.5 py-0.5 bg-blue-50">↑공고</button>
-        <button onclick="triggerUpload(${b.id},'task')" class="text-[9px] text-violet-400 hover:text-violet-600 font-bold border border-violet-200 rounded px-1.5 py-0.5 bg-violet-50">↑과업</button>
-      </div>
-    </div>`;
-}
-
-function inlineEdit(bidId, field, td, opts = {}) {
-  if (td.querySelector('input,select,textarea')) return;
-  const b = bids.find(x => x.id === bidId);
-  if (!b) return;
-  const val = b[field] !== undefined ? b[field] : '';
-  let input;
-  if (opts.type === 'select') {
-    input = document.createElement('select');
-    input.className = 'border border-blue-300 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white';
-    opts.options.forEach(o => {
-      const opt = document.createElement('option');
-      opt.value = o; opt.textContent = o;
-      if (String(val) === o) opt.selected = true;
-      input.appendChild(opt);
+// ── Render ──
+function renderAll(){
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  let data=[...bids];
+  if(q) data=data.filter(b=>b.title.toLowerCase().includes(q)||b.client.toLowerCase().includes(q));
+  if(activeFilter!=='all'){
+    data=data.filter(b=>{
+      const r=b.result||'-';
+      if(activeFilter==='진행중') return r==='-'||r==='';
+      if(activeFilter==='낙찰') return r==='낙찰'||r==='당사낙찰';
+      return r===activeFilter;
     });
-  } else {
-    input = document.createElement('input');
-    input.type = opts.number ? 'number' : 'text';
-    input.value = val;
-    input.className = 'border border-blue-300 rounded px-1.5 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-400 ' + (opts.wide ? 'w-48' : 'w-24');
-    input.placeholder = opts.placeholder || '';
   }
-  const save = async () => {
-    let newVal = opts.number ? Number(input.value) : input.value.trim();
-    if (field === 'partners' && (!newVal || newVal === '')) newVal = '0';
-    b[field] = newVal;
-    await saveAllToSupabase(bids);
-    renderAll();
-  };
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') save();
-    if (e.key === 'Escape') renderAll();
-  });
-  if (opts.type === 'select') input.addEventListener('change', save);
-  const wrap = document.createElement('div');
-  wrap.className = 'flex items-center gap-1';
-  wrap.appendChild(input);
-  if (opts.type !== 'select') {
-    const btnSave = document.createElement('button');
-    btnSave.textContent = '✓';
-    btnSave.className = 'text-[10px] bg-blue-500 text-white rounded px-1 py-0.5 hover:bg-blue-600 leading-none';
-    btnSave.onclick = save;
-    const btnCancel = document.createElement('button');
-    btnCancel.textContent = '✕';
-    btnCancel.className = 'text-[10px] bg-slate-200 text-slate-600 rounded px-1 py-0.5 hover:bg-slate-300 leading-none';
-    btnCancel.onclick = () => renderAll();
-    wrap.appendChild(btnSave);
-    wrap.appendChild(btnCancel);
-  }
-  td.innerHTML = '';
-  td.appendChild(wrap);
-  input.focus();
-  if (input.select) input.select();
+  data.sort((a,b)=>(b.postDate||'').localeCompare(a.postDate||''));
+  renderCards(data);
+  renderCharts(data);
+  renderTable(data);
 }
 
-const EDITABLE = 'cursor-pointer group hover:bg-blue-50 transition-colors';
-const EDIT_ICON = `<span class="hidden group-hover:inline text-[9px] text-blue-300 ml-1">✏</span>`;
+function normalRes(r){if(!r||r==='-'||r==='')return '진행중';if(r==='당사낙찰')return '낙찰';return r;}
 
-function renderTable(data) {
-  const tbody = document.getElementById('dataTable');
-  tbody.innerHTML = data.map(b => {
-    const id = b.id;
-    return `
-      <tr class="hover:bg-slate-50 border-b border-slate-50 transition-colors">
-        <td class="px-3 py-3 font-mono text-slate-400 text-[11px] ${EDITABLE}" onclick="inlineEdit(${id},'postDate',this,{placeholder:'YYYY-MM-DD',wide:false})">${b.postDate}${EDIT_ICON}</td>
-        <td class="px-3 py-3 font-mono text-slate-500 font-bold text-[11px] ${EDITABLE}" onclick="inlineEdit(${id},'date',this,{placeholder:'YYYY-MM-DD',wide:false})">${b.date}${EDIT_ICON}</td>
-        <td class="px-3 py-3 font-mono text-slate-400 text-[11px] ${EDITABLE}" onclick="inlineEdit(${id},'openDate',this,{placeholder:'개찰일시',wide:true})">${b.openDate}${EDIT_ICON}</td>
-        <td class="px-3 py-3 font-bold text-slate-500 text-[11px] ${EDITABLE}" onclick="inlineEdit(${id},'rank',this,{placeholder:'순위',wide:false})">${b.rank}${EDIT_ICON}</td>
-        <td class="px-3 py-3 font-bold text-slate-700 text-[12px] ${EDITABLE}" onclick="inlineEdit(${id},'client',this,{placeholder:'발주처',wide:true})">${b.client}${EDIT_ICON}</td>
-        <td class="px-3 py-3 text-slate-600 leading-tight text-[12px] min-w-[200px] ${EDITABLE}" onclick="inlineEdit(${id},'title',this,{placeholder:'용역명',wide:true})">${b.title}${EDIT_ICON}</td>
-        <td class="px-3 py-3 font-black text-slate-800 text-[12px] ${EDITABLE}" onclick="inlineEdit(${id},'amount',this,{number:true,placeholder:'금액',wide:false})">${b.amount.toLocaleString()}${EDIT_ICON}</td>
-        <td class="px-3 py-3 ${EDITABLE}" onclick="inlineEdit(${id},'result',this,{type:'select',options:['진행중','낙찰','타사낙찰','불참','-']})">
-          <span class="px-2 py-0.5 rounded-full font-bold text-[11px] ${getBadge(b.result)}">${b.result === '-' || !b.result ? '진행중' : b.result}</span>${EDIT_ICON}
-        </td>
-        <td class="px-3 py-3 text-blue-700 font-black text-[12px] ${EDITABLE}" onclick="inlineEdit(${id},'winner',this,{placeholder:'낙찰사',wide:false})">${b.winner}${EDIT_ICON}</td>
-        <td class="px-3 py-3 ${EDITABLE}" onclick="startEditPartners(${id}, this)">
-          <div class="flex flex-wrap gap-0.5 items-center">${renderPartners(b.partners)}${EDIT_ICON}</div>
-        </td>
-        <td class="px-3 py-3">${renderFilePanel(b)}</td>
-        <td class="px-3 py-3 text-center">
-          <button onclick="deleteBid(${id})" class="text-red-400 hover:text-red-600 text-[11px] font-bold hover:underline">삭제</button>
-        </td>
-      </tr>`;
+function renderCards(data){
+  // Card 1
+  const total=data.reduce((s,b)=>s+b.amount,0);
+  document.getElementById('cardAmount').textContent=(total/1e8).toFixed(2)+'억 원';
+  document.getElementById('cardAmountSub').textContent=`${data.length}건 합산`;
+
+  // Card 2
+  document.getElementById('cardJoin').textContent=data.length+'건';
+  const cats=[
+    {keys:['진행중','','-'],label:'진행중',cls:'pill-blue'},
+    {keys:['낙찰','당사낙찰'],label:'낙찰',cls:'pill-green'},
+    {keys:['타사낙찰'],label:'타사낙찰',cls:'pill-red'},
+    {keys:['불참'],label:'불참',cls:'pill-amber'},
+  ];
+  document.getElementById('cardJoinPills').innerHTML=cats.map(c=>{
+    const cnt=data.filter(b=>c.keys.includes(normalRes(b.result)||'진행중')||c.keys.includes(b.result||'-')).length;
+    return cnt?`<span class="pill ${c.cls}">${c.label} ${cnt}</span>`:'';
+  }).join('');
+
+  // Card 3
+  const wins=data.filter(b=>b.result==='낙찰'||b.result==='당사낙찰');
+  document.getElementById('cardWin').textContent=wins.length;
+  document.getElementById('cardWinList').innerHTML=wins.length
+    ?wins.map(b=>`<div class="win-item" title="${b.title}">📌 ${b.title}</div>`).join('')
+    :'<div class="win-item">낙찰 건 없음</div>';
+
+  // Card 4
+  const decided=data.filter(b=>b.result==='낙찰'||b.result==='당사낙찰'||b.result==='타사낙찰');
+  const rate=decided.length?Math.round((wins.length/decided.length)*100):0;
+  document.getElementById('cardRate').textContent=rate+'%';
+  document.getElementById('rateBar').style.width=rate+'%';
+  document.getElementById('cardRateSub').textContent=`낙찰 ${wins.length} / 결과확정 ${decided.length}건`;
+}
+
+function getResultCounts(data,partner){
+  const f=data.filter(b=>{
+    if(!b.partners||b.partners==='0') return false;
+    const first=b.partners.split(/[:+,\s]+/).map(s=>s.trim()).filter(s=>s&&s!=='XX')[0];
+    return first===partner;
+  });
+  const colorMap={'낙찰':'#10b981','타사낙찰':'#ef4444','불참':'#f59e0b','진행중':'#3b82f6'};
+  const counts={};
+  f.forEach(b=>{let r=normalRes(b.result);counts[r]=(counts[r]||0)+1;});
+  const labels=Object.keys(counts);
+  return {labels,datasets:[{data:labels.map(k=>counts[k]),backgroundColor:labels.map(k=>colorMap[k]||'#94a3b8'),borderWidth:2,borderColor:'#fff'}],total:f.length};
+}
+
+function makeDoughnut(id,chartData,color){
+  return new Chart(document.getElementById(id),{
+    type:'doughnut',data:chartData,
+    options:{maintainAspectRatio:false,cutout:'50%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10},padding:8}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw}건`}}}},
+    plugins:[{id:'ct',afterDraw(c){
+      const{ctx,chartArea:{width,height,left,top}}=c;
+      ctx.save();ctx.font='bold 22px Pretendard,sans-serif';ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(chartData.total+'건',left+width/2,top+height/2-6);
+      ctx.font='10px Pretendard,sans-serif';ctx.fillStyle='#94a3b8';ctx.fillText('참여',left+width/2,top+height/2+12);ctx.restore();
+    }}]
+  });
+}
+
+function makeBar(id,data){
+  const months={};
+  data.forEach(b=>{if(!b.postDate) return;const m=b.postDate.slice(0,7);months[m]=(months[m]||0)+1;});
+  const labels=Object.keys(months).sort();
+  return new Chart(document.getElementById(id),{
+    type:'bar',
+    data:{labels:labels.map(l=>l.slice(5)+'월'),datasets:[{label:'참여 건수',data:labels.map(l=>months[l]),backgroundColor:'#bfdbfe',borderRadius:6}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.raw}건`}}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:10}},grid:{color:'#f1f5f9'}},x:{ticks:{font:{size:10}},grid:{display:false}}}}
+  });
+}
+
+function renderCharts(data){
+  if(samanCh){samanCh.destroy();}
+  if(hanmaekCh){hanmaekCh.destroy();}
+  if(monthCh){monthCh.destroy();}
+  samanCh=makeDoughnut('samanChart',getResultCounts(data,'삼안'),'#3b82f6');
+  hanmaekCh=makeDoughnut('hanmaekChart',getResultCounts(data,'한맥'),'#10b981');
+  monthCh=makeBar('monthChart',data);
+}
+
+function getBadge(r){
+  const n=normalRes(r);
+  if(n==='낙찰') return 'badge-green';
+  if(n==='타사낙찰') return 'badge-red';
+  if(n==='불참') return 'badge-amber';
+  return 'badge-blue';
+}
+
+function renderPartners(str){
+  if(!str||str==='0') return '<span style="color:#cbd5e1">-</span>';
+  return str.split(/[:+,\s]+/).map(s=>s.trim()).filter(s=>s&&s!=='XX').map(n=>{
+    const cls=n==='삼안'?'pt-삼안':n==='한맥'?'pt-한맥':n==='바론'?'pt-바론':'pt-other';
+    return `<span class="partner-tag ${cls}">${n}</span>`;
   }).join('');
 }
 
-function getBadge(res) {
-  if (res === '낙찰') return 'bg-green-100 text-green-700';
-  if (res === '타사낙찰') return 'bg-red-100 text-red-700';
-  if (res === '불참') return 'bg-amber-100 text-amber-700';
-  return 'bg-blue-100 text-blue-700';
+function renderFilePanel(b){
+  const rows=f=>(arr,type)=>arr.map((f,i)=>`<div class="file-row"><span class="file-label fl-${type==='notice'?'공고':'과업'}">${type==='notice'?'공고':'과업'}</span><button class="file-btn" onclick="dlFile(${b.id},'${type}',${i})" title="${getFileName(f)}">${getFileName(f)}</button><button class="file-del" onclick="rmFile(${b.id},'${type}',${i})">✕</button></div>`).join('');
+  return `<div class="file-panel">${rows(null,'notice')(b.noticeFiles||[],'notice')}${rows(null,'task')(b.taskFiles||[],'task')}<div class="upload-row"><button class="upload-btn upload-btn-notice" onclick="triggerUp(${b.id},'notice')">↑공고</button><button class="upload-btn upload-btn-task" onclick="triggerUp(${b.id},'task')">↑과업</button></div></div>`;
 }
 
-function renderStats(data) {
-  const totalAmt = data.reduce((sum, b) => sum + b.amount, 0);
-  document.getElementById('total-amount').innerText = (totalAmt / 100000000).toFixed(2) + '억 원';
-  document.getElementById('total-count').innerText = data.length + '건';
-  document.getElementById('lose-count').innerText = data.filter(b => b.result === '타사낙찰').length + '건';
-  document.getElementById('skip-count').innerText = data.filter(b => b.result === '불참').length + '건';
+const EC='edit-cell', EI='<span class="edit-icon">✏</span>';
+function renderTable(data){
+  document.getElementById('tableBody').innerHTML=data.map(b=>`
+  <tr>
+    <td class="${EC}" onclick="ie(${b.id},'postDate',this,{})">${b.postDate}${EI}</td>
+    <td class="${EC}" onclick="ie(${b.id},'date',this,{})">${b.date}${EI}</td>
+    <td class="${EC}" onclick="ie(${b.id},'openDate',this,{w:true})">${b.openDate}${EI}</td>
+    <td class="${EC}" onclick="ie(${b.id},'rank',this,{})">${b.rank}${EI}</td>
+    <td class="${EC}" style="font-weight:700" onclick="ie(${b.id},'client',this,{w:true})">${b.client}${EI}</td>
+    <td class="${EC}" style="font-size:13px;font-weight:600;color:#0f172a" onclick="ie(${b.id},'title',this,{w:true})">${b.title}${EI}</td>
+    <td class="${EC}" style="font-weight:800" onclick="ie(${b.id},'amount',this,{n:true})">${b.amount.toLocaleString()}${EI}</td>
+    <td class="${EC}" onclick="ie(${b.id},'result',this,{sel:true})"><span class="badge ${getBadge(b.result)}">${normalRes(b.result)}</span>${EI}</td>
+    <td class="${EC}" onclick="ie(${b.id},'winner',this,{})">${b.winner}${EI}</td>
+    <td class="${EC}" onclick="ie(${b.id},'partners',this,{w:true})">${renderPartners(b.partners)}${EI}</td>
+    <td>${renderFilePanel(b)}</td>
+    <td style="text-align:center"><button class="btn-del" onclick="delBid(${b.id})">삭제</button></td>
+  </tr>`).join('');
 }
 
-function getResultCounts(data, partner) {
-  const filtered = data.filter(b => {
-    if (!b.partners || b.partners === '0') return false;
-    const first = b.partners.split(/[:+,\s]+/).map(s => s.trim()).filter(s => s && s !== 'XX')[0];
-    return first === partner;
-  });
-  const order = ['낙찰', '타사낙찰', '불참', '진행중'];
-  const colorMap = { '낙찰': '#10b981', '타사낙찰': '#ef4444', '불참': '#f59e0b', '진행중': '#3b82f6' };
-  const counts = {};
-  filtered.forEach(b => {
-    const r = (!b.result || b.result === '-') ? '진행중' : b.result;
-    counts[r] = (counts[r] || 0) + 1;
-  });
-  const labels = order.filter(k => counts[k]);
-  return {
-    labels,
-    datasets: [{ data: labels.map(k => counts[k]), backgroundColor: labels.map(k => colorMap[k] || '#94a3b8'), borderWidth: 2, borderColor: '#fff' }],
-    total: filtered.length
-  };
-}
-
-function makeDoughnut(canvasId, chartData, color) {
-  return new Chart(document.getElementById(canvasId), {
-    type: 'doughnut',
-    data: chartData,
-    options: {
-      maintainAspectRatio: false,
-      cutout: '45%',
-      plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 }, padding: 8 } },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}건` } }
-      }
-    },
-    plugins: [{
-      id: 'centerText',
-      afterDraw(chart) {
-        const { ctx, chartArea: { width, height, left, top } } = chart;
-        ctx.save();
-        ctx.font = 'bold 20px Pretendard, sans-serif';
-        ctx.fillStyle = color;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(chartData.total + '건', left + width / 2, top + height / 2 - 6);
-        ctx.font = '10px Pretendard, sans-serif';
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillText('참여', left + width / 2, top + height / 2 + 12);
-        ctx.restore();
-      }
-    }]
-  });
-}
-
-function renderCharts(data) {
-  if (samanChart) samanChart.destroy();
-  if (hanmaekChart) hanmaekChart.destroy();
-  samanChart = makeDoughnut('samanChart', getResultCounts(data, '삼안'), '#3b82f6');
-  hanmaekChart = makeDoughnut('hanmaekChart', getResultCounts(data, '한맥'), '#10b981');
-}
-
-// 모달 파일 관리
-let _modalFiles = { notice: [], task: [] };
-let _modalPendingFiles = { notice: [], task: [] }; // 아직 업로드 안 된 File 객체
-
-function handleModalUpload(event, containerId) {
-  const files = Array.from(event.target.files);
-  if (!files.length) return;
-  const type = containerId === 'notice-files' ? 'notice' : 'task';
-  files.forEach(file => {
-    _modalPendingFiles[type].push(file);
-    _modalFiles[type].push({ name: file.name, pending: true });
-  });
-  renderModalFileList(containerId, type);
-  event.target.value = '';
-}
-
-function renderModalFileList(containerId, type) {
-  const container = document.getElementById(containerId);
-  container.innerHTML = _modalFiles[type].map((f, i) => `
-    <div class="flex items-center gap-1.5 group">
-      <span class="text-[11px] text-slate-600 truncate flex-1">${f.name}</span>
-      <button type="button" onclick="removeModalFile('${type}',${i})" class="text-red-400 hover:text-red-600 text-xs font-bold">✕</button>
-    </div>`).join('');
-}
-
-function removeModalFile(type, idx) {
-  _modalFiles[type].splice(idx, 1);
-  renderModalFileList(type === 'notice' ? 'notice-files' : 'task-files', type);
-}
-
-function loadFileList(containerId, files = []) {
-  const type = containerId === 'notice-files' ? 'notice' : 'task';
-  _modalFiles[type] = files.map(f => typeof f === 'string' ? { name: f, data: null, mime: '' } : f);
-  renderModalFileList(containerId, type);
-}
-
-function openModal(id = null) {
-  _modalFiles = { notice: [], task: [] };
-  _modalPendingFiles = { notice: [], task: [] };
-  document.getElementById('modal').classList.remove('hidden');
-  if (id) {
-    const b = bids.find(x => x.id === id);
-    document.getElementById('edit-id').value = b.id;
-    document.getElementById('m_post_date').value = b.postDate;
-    document.getElementById('m_date').value = b.date;
-    document.getElementById('m_open_date').value = b.openDate;
-    document.getElementById('m_rank').value = b.rank;
-    document.getElementById('m_client').value = b.client;
-    document.getElementById('m_title').value = b.title;
-    document.getElementById('m_amount').value = b.amount;
-    document.getElementById('m_result').value = b.result;
-    document.getElementById('m_winner').value = b.winner;
-    document.getElementById('m_partners').value = b.partners;
-    loadFileList('notice-files', b.noticeFiles || []);
-    loadFileList('task-files', b.taskFiles || []);
-  } else {
-    ['edit-id','m_post_date','m_date','m_open_date','m_rank','m_client','m_title','m_amount','m_result','m_winner','m_partners'].forEach(id => {
-      document.getElementById(id).value = '';
+// Inline edit
+function ie(id,field,td,opts){
+  if(td.querySelector('input,select')) return;
+  const b=bids.find(x=>x.id===id);if(!b) return;
+  const val=b[field]!==undefined?b[field]:'';
+  let el;
+  if(opts.sel){
+    el=document.createElement('select');el.className='inline-input';
+    ['진행중','낙찰','당사낙찰','타사낙찰','불참'].forEach(o=>{
+      const op=document.createElement('option');op.value=o==='진행중'?'-':o;op.textContent=o;
+      if((val==='-'&&o==='진행중')||val===o) op.selected=true;
+      el.appendChild(op);
     });
-    loadFileList('notice-files', []);
-    loadFileList('task-files', []);
+    el.addEventListener('change',async()=>{b[field]=el.value;await saveAll(bids);renderAll();});
+  } else {
+    el=document.createElement('input');el.type=opts.n?'number':'text';el.value=val;
+    el.className='inline-input';el.style.width=opts.w?'160px':'90px';
+    const save=async()=>{b[field]=opts.n?Number(el.value):el.value.trim();await saveAll(bids);renderAll();};
+    el.addEventListener('keydown',e=>{if(e.key==='Enter')save();if(e.key==='Escape')renderAll();});
+    const sw=document.createElement('button');sw.className='btn-save-sm';sw.textContent='✓';sw.onclick=save;
+    const cx=document.createElement('button');cx.className='btn-cancel-sm';cx.textContent='✕';cx.onclick=()=>renderAll();
+    td.innerHTML='';
+    const wrap=document.createElement('div');wrap.style.display='flex';wrap.style.gap='4px';wrap.style.alignItems='center';
+    wrap.append(el,sw,cx);td.appendChild(wrap);el.focus();if(el.select)el.select();return;
   }
+  td.innerHTML='';td.appendChild(el);el.focus();
 }
 
-function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+// File ops
+function dlFile(bid,type,idx){const b=bids.find(x=>x.id===bid);if(!b)return;const f=(type==='notice'?b.noticeFiles:b.taskFiles)[idx];if(!f)return;const url=getFileUrl(f);if(url){const a=document.createElement('a');a.href=url;a.download=getFileName(f);a.click();}else alert('파일을 찾을 수 없습니다.');}
+async function rmFile(bid,type,idx){const b=bids.find(x=>x.id===bid);if(!b)return;const arr=type==='notice'?b.noticeFiles:b.taskFiles;arr.splice(idx,1);await saveAll(bids);renderAll();}
+function triggerUp(bid,type){const inp=document.createElement('input');inp.type='file';inp.multiple=true;inp.accept='.pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png';inp.onchange=async()=>{const files=Array.from(inp.files);if(!files.length)return;const b=bids.find(x=>x.id===bid);if(!b)return;showBanner('⏫ 업로드 중...','#1d4ed8');for(const file of files){const fo=await uploadFile(bid,type,file);if(type==='notice')b.noticeFiles=[...(b.noticeFiles||[]),fo];else b.taskFiles=[...(b.taskFiles||[]),fo];}await saveAll(bids);renderAll();};inp.click();}
 
-async function submitForm() {
-  const id = document.getElementById('edit-id').value;
-  const bidId = id ? parseInt(id) : Date.now();
+async function delBid(id){if(confirm('이 항목을 삭제하시겠습니까?')){bids=bids.filter(x=>x.id!==id);await saveAll(bids);renderAll();}}
 
-  // Storage에 pending 파일 업로드
-  showBanner('⏫ 저장 중...', '#1d4ed8');
-  try {
-    for (const file of _modalPendingFiles.notice) {
-      const fileObj = await uploadToStorage(bidId, 'notice', file);
-      // pending 항목을 실제 fileObj로 교체
-      const pi = _modalFiles.notice.findIndex(f => f.pending && f.name === file.name);
-      if (pi >= 0) _modalFiles.notice[pi] = fileObj;
-      else _modalFiles.notice.push(fileObj);
-    }
-    for (const file of _modalPendingFiles.task) {
-      const fileObj = await uploadToStorage(bidId, 'task', file);
-      const pi = _modalFiles.task.findIndex(f => f.pending && f.name === file.name);
-      if (pi >= 0) _modalFiles.task[pi] = fileObj;
-      else _modalFiles.task.push(fileObj);
-    }
-  } catch(e) {
-    console.error('파일 업로드 실패:', e);
-    showBanner('⚠️ 파일 업로드 실패', '#b91c1c');
-    return;
+// Modal
+function openModal(id=null){
+  modalFiles={notice:[],task:[]};pendingFiles={notice:[],task:[]};
+  document.getElementById('modalOverlay').classList.add('open');
+  if(id){
+    const b=bids.find(x=>x.id===id);
+    document.getElementById('modalTitle').textContent='입찰 정보 수정';
+    document.getElementById('mId').value=b.id;
+    document.getElementById('mPostDate').value=b.postDate;
+    document.getElementById('mDate').value=b.date;
+    document.getElementById('mOpenDate').value=b.openDate;
+    document.getElementById('mRank').value=b.rank;
+    document.getElementById('mClient').value=b.client;
+    document.getElementById('mTitle').value=b.title;
+    document.getElementById('mAmount').value=b.amount;
+    document.getElementById('mResult').value=b.result||'-';
+    document.getElementById('mWinner').value=b.winner;
+    document.getElementById('mPartners').value=b.partners;
+    modalFiles.notice=[...(b.noticeFiles||[])];
+    modalFiles.task=[...(b.taskFiles||[])];
+  } else {
+    document.getElementById('modalTitle').textContent='신규 입찰 등록';
+    ['mId','mPostDate','mDate','mOpenDate','mRank','mClient','mTitle','mAmount','mWinner','mPartners'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('mResult').value='-';
   }
+  renderModalFiles();
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+function renderModalFiles(){
+  ['notice','task'].forEach(type=>{
+    const cont=document.getElementById(type==='notice'?'mNoticeFiles':'mTaskFiles');
+    cont.innerHTML=modalFiles[type].map((f,i)=>`<div style="display:flex;align-items:center;gap:4px;font-size:10px;margin-bottom:2px"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${getFileName(f)}</span><button style="color:#ef4444;background:none;border:none;cursor:pointer" onclick="rmModalFile('${type}',${i})">✕</button></div>`).join('');
+  });
+}
+function rmModalFile(type,i){modalFiles[type].splice(i,1);renderModalFiles();}
+function handleModalFile(e,type){Array.from(e.target.files).forEach(f=>{pendingFiles[type].push(f);modalFiles[type].push({name:f.name,pending:true});});renderModalFiles();e.target.value='';}
 
-  const newData = {
-    id: bidId,
-    postDate: document.getElementById('m_post_date').value,
-    date: document.getElementById('m_date').value,
-    openDate: document.getElementById('m_open_date').value,
-    rank: document.getElementById('m_rank').value,
-    client: document.getElementById('m_client').value,
-    title: document.getElementById('m_title').value,
-    amount: parseInt(document.getElementById('m_amount').value) || 0,
-    result: document.getElementById('m_result').value,
-    winner: document.getElementById('m_winner').value,
-    partners: document.getElementById('m_partners').value,
-    noticeFiles: _modalFiles.notice.filter(f => !f.pending),
-    taskFiles: _modalFiles.task.filter(f => !f.pending)
-  };
-  if (id) bids[bids.findIndex(x => x.id === parseInt(id))] = newData;
-  else bids.unshift(newData);
-  await saveAllToSupabase(bids);
+async function submitForm(){
+  const id=document.getElementById('mId').value;
+  const bid=id?parseInt(id):Date.now();
+  showBanner('⏫ 저장 중...','#1d4ed8');
+  for(const type of['notice','task']){
+    for(const file of pendingFiles[type]){
+      const fo=await uploadFile(bid,type,file);
+      const pi=modalFiles[type].findIndex(f=>f.pending&&f.name===file.name);
+      if(pi>=0)modalFiles[type][pi]=fo;else modalFiles[type].push(fo);
+    }
+  }
+  const entry={id:bid,postDate:document.getElementById('mPostDate').value,date:document.getElementById('mDate').value,openDate:document.getElementById('mOpenDate').value,rank:document.getElementById('mRank').value,client:document.getElementById('mClient').value,title:document.getElementById('mTitle').value,amount:parseInt(document.getElementById('mAmount').value)||0,result:document.getElementById('mResult').value,winner:document.getElementById('mWinner').value,partners:document.getElementById('mPartners').value,noticeFiles:modalFiles.notice.filter(f=>!f.pending),taskFiles:modalFiles.task.filter(f=>!f.pending)};
+  if(id) bids[bids.findIndex(x=>x.id===parseInt(id))]=entry;
+  else bids.unshift(entry);
+  await saveAll(bids);renderAll();closeModal();
+}
+
+// Close modal on overlay click
+document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
+
+// ── Init Data ──
+const INIT = [
+  {id:1,postDate:'2025-12-31',date:'2026-01-13',openDate:'2026-02-12',rank:'14위',client:'연천군맑은물관리사업소',title:'청산배수지건설공사기본및실시설계용역',amount:73384542,result:'타사낙찰',winner:'동명',partners:'삼안:한맥:바론:경수',noticeFiles:[],taskFiles:[]},
+  {id:2,postDate:'2025-12-30',date:'2026-01-06',openDate:'-',rank:'-',client:'경기도 포천시',title:'포천천 인도교 설치사업 기본 및 실시설계 용역',amount:13824580,result:'불참',winner:'-',partners:'삼안:XX:바론:XX',noticeFiles:[],taskFiles:[]},
+  {id:3,postDate:'2025-12-30',date:'2026-01-06',openDate:'2026-01-07(11시)',rank:'22위',client:'경기도 김포시',title:'하성농어촌도로리도207호선개설사업기본및실시설계용역',amount:138988300,result:'타사낙찰',winner:'경동',partners:'삼안:주하:바론:에스피',noticeFiles:[],taskFiles:[]},
+  {id:4,postDate:'2026-01-05',date:'2026-01-20',openDate:'2026-02-27(11시)',rank:'21위',client:'경상남도 진주시',title:'진주시 나불지구 풍수해생활권 종합정비사업 기본 및 실시설계',amount:419903300,result:'타사낙찰',winner:'유신',partners:'한맥+혜인+바론+세경',noticeFiles:[],taskFiles:[]},
+  {id:5,postDate:'2026-01-07',date:'2026-01-19',openDate:'2026-02-12(11시)',rank:'10위',client:'양평군환경사업소',title:'양평군 노후하수관로 정비사업 실시설계 용역',amount:213023041,result:'타사낙찰',winner:'이산',partners:'삼안:다산:바론',noticeFiles:[],taskFiles:[]},
+  {id:6,postDate:'2025-12-30',date:'2026-01-16',openDate:'2026-02-12(13시)',rank:'2위',client:'금강유역환경청',title:"금강 하천시설 유지보수 실시설계용역('26~'28년)",amount:74500000,result:'타사낙찰',winner:'도화',partners:'삼안:한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:7,postDate:'2026-02-09',date:'-',openDate:'-',rank:'-',client:'서울특별시',title:'탄천.한강변차집관로정비공사기본및실시설계용역(협상)',amount:0,result:'불참',winner:'-',partners:'0',noticeFiles:[],taskFiles:[]},
+  {id:8,postDate:'2026-01-28',date:'2026-02-06',openDate:'2026-02-09 (11시)',rank:'16위',client:'경기도 파주시',title:'수내천(소하천)정비사업 기본 및 실시설계용역',amount:73575600,result:'타사낙찰',winner:'건일',partners:'삼안:한맥:바론:GSTA',noticeFiles:[],taskFiles:[]},
+  {id:9,postDate:'2026-02-20',date:'2026-03-05',openDate:'-',rank:'-',client:'구례군',title:'구례군 소하천정비종합계획수립 및 지형도면신고시 용역',amount:0,result:'불참',winner:'-',partners:'한맥:XX:바론:XX',noticeFiles:[],taskFiles:[]},
+  {id:10,postDate:'2026-02-26',date:'2026-03-04',openDate:'2026-03-05 (15시)',rank:'-',client:'경기도청북부청사',title:'경기북부양생동물 생태관찰원조성사업기본및실시설계용역',amount:32087000,result:'타사낙찰',winner:'도화',partners:'삼안:75.7:바론:10',noticeFiles:[],taskFiles:[]},
+  {id:11,postDate:'2026-01-13',date:'2026-01-26',openDate:'2026-03-12(11시)',rank:'-',client:'평택시',title:'평택시통복천생태하천복원실시설계용역(장기계속계약)',amount:147096500,result:'타사낙찰',winner:'한종',partners:'삼안:한맥:바론:에스피',noticeFiles:[],taskFiles:[]},
+  {id:12,postDate:'2026-02-02',date:'2026-02-13',openDate:'-',rank:'-',client:'안양시',title:'안양시분류식하수관로및노후하수관로정비공사기본및실시설계용역',amount:87369568,result:'타사낙찰',winner:'한종',partners:'삼안:태조:바론:GSTA',noticeFiles:[],taskFiles:[]},
+  {id:13,postDate:'2026-02-05',date:'2026-02-25',openDate:'2026-04-29',rank:'-',client:'용인특례시',title:'왕산.갈담자연재해위험개선지구정비사업기본및실시설계용역',amount:187304000,result:'당사낙찰',winner:'-',partners:'삼안:한맥:바론:GSTA',noticeFiles:[],taskFiles:[]},
+  {id:14,postDate:'2026-02-05',date:'2026-02-20',openDate:'-',rank:'-',client:'파주시',title:'파주시소하천정비종합계획재수립용역',amount:730908000,result:'타사낙찰',winner:'건화',partners:'삼안:한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:15,postDate:'2026-02-10',date:'2026-02-24',openDate:'-',rank:'-',client:'경기도광주시',title:'초월지구풍수해생활권종합정비사업기본및실시설계용역',amount:124457048,result:'-',winner:'-',partners:'삼안:한맥:바론:에스피',noticeFiles:[],taskFiles:[]},
+  {id:16,postDate:'2026-02-10',date:'2026-02-24',openDate:'-',rank:'-',client:'평택시상하수도사업소',title:'평택시북부지역노후상수관망정비사업기본및실시설계용역',amount:235800000,result:'타사낙찰',winner:'건화',partners:'삼안:바론=분담',noticeFiles:[],taskFiles:[]},
+  {id:17,postDate:'2026-02-11',date:'2026-02-25',openDate:'-',rank:'-',client:'안양시',title:'안양시 노후상수관망정비사업실시설계용역',amount:214975347,result:'타사낙찰',winner:'건화',partners:'삼안:태조:바론:에스피',noticeFiles:[],taskFiles:[]},
+  {id:18,postDate:'2026-02-26',date:'2026-03-10',openDate:'3월 중',rank:'-',client:'김해시',title:'김해시 소하천 정비종합계획 재수립 및 지형도면고시용역',amount:625616320,result:'타사낙찰',winner:'KCI',partners:'한맥:XX:바론:XX',noticeFiles:[],taskFiles:[]},
+  {id:19,postDate:'2026-02-27',date:'2026-03-10',openDate:'3월 중',rank:'-',client:'홍성군',title:'충남 어사 자연재해위험개선지구 정비사업 기본 및 실시설계',amount:119743911,result:'-',winner:'-',partners:'한맥:XX:바론:XX',noticeFiles:[],taskFiles:[]},
+  {id:20,postDate:'2026-03-03',date:'2026-03-13',openDate:'3월 중',rank:'-',client:'함안군',title:'유동 자연재해위험개선지구 정비사업 기본 및 실시설계용역',amount:64688400,result:'-',winner:'-',partners:'한맥:XX:바론:XX',noticeFiles:[],taskFiles:[]},
+  {id:21,postDate:'2026-02-24',date:'2026-03-10',openDate:'3월 중',rank:'-',client:'양평군환경사업소',title:'국수 공공하수처리시설 증설사업 기본 및 실시설계 용역',amount:5946600,result:'-',winner:'-',partners:'삼안:한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:22,postDate:'2026-03-10',date:'2026-03-25',openDate:'미정',rank:'-',client:'세종특별자치시',title:'세종 스마트 국가산단 진입도로 건설공사 기본 및 실시설계용역',amount:104850000,result:'-',winner:'-',partners:'한맥:바론:XX지질',noticeFiles:[],taskFiles:[]},
+  {id:23,postDate:'2026-03-16',date:'2026-03-27',openDate:'-',rank:'-',client:'가평군',title:'가평군 소하천정비종합계획 및 지형도면고시 용역',amount:220493962,result:'-',winner:'-',partners:'삼안:한맥:바론=70:30:측량',noticeFiles:[],taskFiles:[]},
+  {id:24,postDate:'2026-03-09',date:'2026-04-16',openDate:'2026/04/16 14:00',rank:'-',client:'국가철도공단',title:'수도권광역급행철도 A노선 연장운행 사업 노반, 궤도 기본 및 실시설계 엔지니어링',amount:236428500,result:'-',winner:'-',partners:'삼안:바론',noticeFiles:[],taskFiles:[]},
+  {id:25,postDate:'2026-03-24',date:'2026-04-03',openDate:'2026/04/03 18:00:00',rank:'-',client:'경상남도 고성군',title:'고성군 소하천정비종합계획 재수립 및 지형도면고시 용역(동부권역)',amount:655354800,result:'-',winner:'-',partners:'삼안:바론',noticeFiles:[],taskFiles:[]},
+  {id:26,postDate:'2026-03-24',date:'2026-04-03',openDate:'-',rank:'-',client:'경상남도 고성군',title:'고성군 소하천정비종합계획 재수립 및 지형도면고시 용역(서부권역)',amount:618884000,result:'-',winner:'-',partners:'삼안:바론',noticeFiles:[],taskFiles:[]},
+  {id:27,postDate:'2026-03-25',date:'2026-04-15',openDate:'-',rank:'-',client:'평택지방해양수산청',title:'평택당진항배수로호안보강공사실시설계용역',amount:40000000,result:'-',winner:'-',partners:'삼안:바론',noticeFiles:[],taskFiles:[]},
+  {id:28,postDate:'2026-03-30',date:'2026-04-08',openDate:'-',rank:'-',client:'파주시',title:'야당동하수도정비중점관리지역도시침수대응사업기본및실시설계',amount:235280100,result:'-',winner:'-',partners:'삼안:바론',noticeFiles:[],taskFiles:[]},
+  {id:29,postDate:'2026-03-30',date:'2026-04-03',openDate:'-',rank:'-',client:'경기평택항만공사',title:'평택당진항액체부두통합유지준설기본및실시설계용역',amount:84675000,result:'-',winner:'-',partners:'삼안:바론',noticeFiles:[],taskFiles:[]},
+  {id:30,postDate:'2026-04-06',date:'2026-04-15',openDate:'-',rank:'-',client:'충청남도 부여군',title:'합곡원문 자연재해위험개선지구 정비사업 기본 및 실시설계용역',amount:216148914,result:'-',winner:'-',partners:'한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:31,postDate:'2026-04-07',date:'2026-04-15',openDate:'-',rank:'-',client:'충청남도 부여군',title:'정암 풍수해생활권 종합정비사업 기본 및 실시설계용역',amount:210699665,result:'-',winner:'-',partners:'한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:32,postDate:'2026-04-07',date:'2026-04-15',openDate:'-',rank:'-',client:'충청남도 부여군',title:'함양 자연재해위험개선지구 정비사업 기본 및 실시설계용역',amount:128803340,result:'-',winner:'-',partners:'한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:33,postDate:'2026-04-07',date:'2026-04-15',openDate:'-',rank:'-',client:'충청남도 당진시',title:'검암지구 자연재해위험개선지구 기본 및 실시설계 용역',amount:635614397,result:'-',winner:'-',partners:'한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:34,postDate:'2026-04-08',date:'2026-04-16',openDate:'-',rank:'-',client:'서울지방국토관리청',title:'국도46호선 남양주(왕숙지구)도로확장공사 실시설계용역',amount:0,result:'-',winner:'-',partners:'한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:35,postDate:'2026-04-08',date:'2026-04-13',openDate:'-',rank:'-',client:'경상북도 경주시',title:'대천8지구풍수해생활권종합정비사업기본및실시설계용역(총괄분)',amount:78956900,result:'-',winner:'-',partners:'한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:36,postDate:'2026-04-08',date:'2026-04-13',openDate:'-',rank:'-',client:'경상북도 경주시',title:'외동동천자연재해위험개선지구정비사업기본및실시설계용역(총괄분)',amount:249876000,result:'-',winner:'-',partners:'한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:37,postDate:'2026-04-09',date:'2026-04-24',openDate:'2026년 6월 중',rank:'-',client:'진주시',title:'진주시 소하천정비종합계획(변경) 및 지형도면 고시 용역',amount:713912000,result:'-',winner:'-',partners:'한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:38,postDate:'2026-03-17',date:'-',openDate:'-',rank:'-',client:'인제군',title:'빙어호 인도교 조성사업 기본설계 용역',amount:36595500,result:'타사낙찰',winner:'바우',partners:'한맥:바론',noticeFiles:[],taskFiles:[]},
+  {id:39,postDate:'2026-01-02',date:'2026-03-25',openDate:'-',rank:'-',client:'정읍시',title:'정읍시 가축분뇨공공처리시설(우분연료화)설치사업 환경영향평가 용역',amount:276357000,result:'타사낙찰',winner:'도화',partners:'한맥:바론',noticeFiles:[],taskFiles:[]}
+];
+
+async function init(){
+  bids=await loadData();
   renderAll();
-  closeModal();
+  checkConn();
 }
-
-async function deleteBid(id) {
-  if (confirm('삭제?')) {
-    bids = bids.filter(x => x.id !== id);
-    await saveAllToSupabase(bids);
-    renderAll();
-  }
-}
-
-window.onload = initApp;
+init();
 </script>
 </body>
 </html>
